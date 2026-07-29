@@ -34,7 +34,10 @@ test("declares durable storage, archive routes, and a versioned relational schem
 
   assert.match(page, /<ArchiveApp \/>/);
   assert.match(layout, /robots:\s*\{\s*index:\s*false,\s*follow:\s*false\s*\}/);
-  assert.deepEqual(JSON.parse(hosting), { d1: "DB", r2: "PHOTOS" });
+  const hostingConfig = JSON.parse(hosting);
+  assert.equal(hostingConfig.d1, "DB");
+  assert.equal(hostingConfig.r2, "PHOTOS");
+  assert.match(hostingConfig.project_id, /^appgprj_/);
   assert.match(archive, /action === "startVisit"/);
   assert.match(archive, /action === "batchOrganize"/);
   assert.match(archive, /action === "softDelete"/);
