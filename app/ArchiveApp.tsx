@@ -51,10 +51,10 @@ const EMPTY: Snapshot = {
 
 const mainNav = [
   ["home", "首页", "⌂"],
-  ["visits", "参观", "日"],
+  ["visits", "到访", "日"],
   ["places", "地点", "所"],
   ["exhibitions", "展览", "展"],
-  ["objects", "作品与文物", "物"],
+  ["objects", "观察对象", "物"],
   ["inbox", "整理收件箱", "收"],
   ["trips", "旅程", "行"],
   ["search", "搜索", "⌕"],
@@ -62,6 +62,11 @@ const mainNav = [
 ] as const;
 
 const photoLabels: Record<string, string> = {
+  travel_scene: "旅行与城市",
+  street: "街景",
+  landscape: "自然景观",
+  food: "饮食与日常",
+  transport: "交通与路途",
   object_main: "作品主图",
   object_detail: "作品局部",
   label: "铭牌",
@@ -73,6 +78,12 @@ const photoLabels: Record<string, string> = {
 };
 
 const objectTypes = [
+  "街道与街景",
+  "城市地标",
+  "店铺与空间",
+  "自然景观",
+  "交通与路途",
+  "城市细部",
   "绘画",
   "雕塑",
   "摄影",
@@ -722,9 +733,9 @@ export default function ArchiveApp() {
               weekday: "long",
             }).format(new Date())}
           </p>
-          <h1>今天留下什么？</h1>
+          <h1>今天看见什么？</h1>
           <p className="lede">
-            现场先记下，回家再整理。你的原始照片与笔记默认只对自己可见。
+            一次旅行、一段街道或一件展品，都可以先记下，回家再慢慢整理。
           </p>
         </div>
         <button
@@ -736,7 +747,7 @@ export default function ArchiveApp() {
           data-testid="start-visit"
         >
           <span>{activeVisit ? "继续" : "开始"}</span>
-          <strong>{activeVisit ? "正在进行的参观" : "开始参观"}</strong>
+          <strong>{activeVisit ? "继续这次记录" : "开始记录"}</strong>
           <i>→</i>
         </button>
       </header>
@@ -745,7 +756,7 @@ export default function ArchiveApp() {
         <button className="ongoing-strip" onClick={() => setView("live")}>
           <span className="pulse" />
           <div>
-            <small>正在参观 · {elapsedMinutes} 分钟</small>
+            <small>正在记录 · {elapsedMinutes} 分钟</small>
             <strong>{activeVenue?.name}</strong>
           </div>
           <span>{activeCaptures.length} 条记录 →</span>
@@ -758,12 +769,12 @@ export default function ArchiveApp() {
             <p className="section-number">01 / 建立档案</p>
             <h2>从一次真实经历开始</h2>
             <p>
-              不必先整理过去的一切。开始第一次参观、补录一条旧记录，或导入现有清单。
+              不必先整理过去的一切。开始一次到访、补录一段旅行，或导入现有清单。
             </p>
           </div>
           <div className="first-actions">
-            <button onClick={() => setModal("start")}>开始第一次参观</button>
-            <button onClick={() => setModal("history")}>补录过去的参观</button>
+            <button onClick={() => setModal("start")}>开始第一次记录</button>
+            <button onClick={() => setModal("history")}>补录过去的旅行</button>
             <button onClick={() => setModal("trip")}>创建旅行计划</button>
             <button onClick={() => setView("data")}>导入 CSV</button>
           </div>
@@ -775,7 +786,7 @@ export default function ArchiveApp() {
           <div className="section-head">
             <div>
               <p className="section-number">02 / 最近</p>
-              <h2>最近参观</h2>
+              <h2>最近记录</h2>
             </div>
             <button className="text-button" onClick={() => setView("visits")}>
               查看全部
@@ -834,9 +845,9 @@ export default function ArchiveApp() {
             </div>
           ) : (
             <EmptyState
-              title="还没有参观记录"
-              body="到达现场时，只需要选一个地点就能开始。"
-              action="开始第一次参观"
+              title="还没有到访记录"
+              body="到达一个地点时，只需要选一个地点就能开始。"
+              action="开始第一次记录"
               onAction={() => setModal("start")}
             />
           )}
@@ -935,14 +946,14 @@ export default function ArchiveApp() {
           <div>
             <p className="eyebrow">Visits / 每一次进入</p>
             <h1>参观</h1>
-            <p>同一个地点的每一次到访，都保留为独立经历。</p>
+            <p>每一次到访、散步或旅行停留，都保留为独立经历。</p>
           </div>
           <div className="head-actions">
             <button className="secondary" onClick={() => setModal("history")}>
               历史补录
             </button>
             <button className="primary" onClick={() => setModal("start")}>
-              ＋ 开始参观
+              ＋ 开始记录
             </button>
           </div>
         </header>
@@ -963,9 +974,9 @@ export default function ArchiveApp() {
         </div>
         {!data.visits.length ? (
           <EmptyState
-            title="参观时间线还是空的"
-            body="开始一次现场参观，或从记得的年份慢慢补录。"
-            action="补录过去的参观"
+            title="到访时间线还是空的"
+            body="开始一次现场记录，或从记得的年份慢慢补录。"
+            action="补录过去的旅行"
             onAction={() => setModal("history")}
           />
         ) : visitView === "year" ? (
@@ -1141,8 +1152,8 @@ export default function ArchiveApp() {
         <header className="page-head">
           <div>
             <p className="eyebrow">Places / 地域档案</p>
-            <h1>场馆与地点</h1>
-            <p>按国家、地区与城市浏览，不依赖不稳定的地图服务。</p>
+            <h1>城市与旅行地点</h1>
+            <p>博物馆、街区、建筑、自然与日常停留，都按国家、地区与城市归档。</p>
           </div>
           <button className="primary" onClick={() => setModal("venue")}>
             ＋ 新建地点
@@ -1151,7 +1162,7 @@ export default function ArchiveApp() {
         {!data.venues.length ? (
           <EmptyState
             title="还没有地点"
-            body="博物馆、遗址、寺院、石窟与古建筑都可以各自建档。"
+            body="博物馆、街区、城市街道、咖啡馆、建筑、自然与遗址都可以各自建档。"
             action="新建第一个地点"
             onAction={() => setModal("venue")}
           />
@@ -1178,7 +1189,7 @@ export default function ArchiveApp() {
                         </div>
                         <div>
                           <strong>{visits.length}</strong>
-                          <span>次参观</span>
+                        <span>次到访</span>
                         </div>
                         <p>{venue.personal_impression || venue.general_notes || "尚未写下整体印象。"}</p>
                         <button
@@ -1274,8 +1285,8 @@ export default function ArchiveApp() {
       <header className="page-head">
         <div>
           <p className="eyebrow">Objects / 所见之物</p>
-          <h1>作品与文物</h1>
-          <p>同一件对象可以关联多次参观，不必重复建档。</p>
+          <h1>观察对象</h1>
+          <p>展品、建筑、街景、店铺、自然与城市细部，都可以关联多次到访。</p>
         </div>
         <div className="head-actions">
           <button
@@ -1343,8 +1354,8 @@ export default function ArchiveApp() {
       </div>
       {!data.objects.length ? (
         <EmptyState
-          title="还没有单独建档的对象"
-          body="现场可以只拍照片；回家后再从照片组创建作品或文物记录。"
+          title="还没有单独建档的观察对象"
+          body="现场可以只拍照片；回家后再从照片组创建建筑、街景、展品或其他观察对象。"
           action="去整理收件箱"
           onAction={() => setView("inbox")}
         />
@@ -1378,7 +1389,7 @@ export default function ArchiveApp() {
                   {object.original_title ? <p>{object.original_title}</p> : null}
                   <dl>
                     <div>
-                      <dt>作者 / 文化</dt>
+                      <dt>作者 / 背景</dt>
                       <dd>{object.creator || object.culture_or_dynasty || "未填写"}</dd>
                     </div>
                     <div>
@@ -1904,7 +1915,7 @@ export default function ArchiveApp() {
                 ["visits", "参观"],
                 ["venues", "地点"],
                 ["exhibitions", "展览"],
-                ["objects", "作品与文物"],
+                ["objects", "观察对象"],
                 ["trips", "旅程"],
                 ["photos", "照片清单"],
               ].map(([type, label]) => (
@@ -2244,9 +2255,9 @@ export default function ArchiveApp() {
       return (
         <div className="page">
           <EmptyState
-            title="没有正在进行的参观"
+            title="没有正在进行的记录"
             body="从选择一个地点开始，十秒内即可进入现场记录。"
-            action="开始参观"
+            action="开始记录"
             onAction={() => setModal("start")}
           />
         </div>
@@ -2264,7 +2275,7 @@ export default function ArchiveApp() {
             ←
           </button>
           <div>
-            <small>正在参观 · {elapsedMinutes} 分钟</small>
+            <small>正在记录 · {elapsedMinutes} 分钟</small>
             <h1>{activeVenue.name}</h1>
             {activeExhibitions.length ? (
               <details>
@@ -2281,15 +2292,15 @@ export default function ArchiveApp() {
             <span className={online ? "online" : "local-only"}>
               {online ? "已连接" : "仅保存在本机"}
             </span>
-            <button onClick={() => setModal("end")}>结束参观</button>
+            <button onClick={() => setModal("end")}>结束记录</button>
           </div>
         </header>
 
         <main className="live-feed">
           <div className="live-intro">
             <span>{activeCaptures.length}</span>
-            <p>条现场记录</p>
-            <small>照片与文字自动关联本次参观</small>
+            <p>条旅行记录</p>
+            <small>照片与文字自动关联本次到访</small>
           </div>
           {uploadProgress ? (
             <div className="upload-status">
@@ -2309,7 +2320,7 @@ export default function ArchiveApp() {
           ) : null}
           {!activeCaptures.length ? (
             <div className="live-empty">
-              <p>只拍一张照片，或写一句话，也是一条完整记录。</p>
+              <p>只拍一张街景、建筑或展品照片，或写一句话，也是一条完整记录。</p>
               <span>底部操作栏适合单手使用</span>
             </div>
           ) : (
@@ -2373,7 +2384,7 @@ export default function ArchiveApp() {
               将 {selectedPhotoIds.size} 张照片组成一组 →
             </button>
           ) : photoCaptures.length > 1 ? (
-            <p className="selection-hint">点选照片左上角，可将主图、局部与铭牌组成一组。</p>
+            <p className="selection-hint">点选照片左上角，可将街景、建筑细部、展品或说明照片组成一组。</p>
           ) : null}
           <div className="live-bottom-space" />
         </main>
@@ -2418,11 +2429,11 @@ export default function ArchiveApp() {
               accept="image/*"
               multiple
               onChange={(event) =>
-                uploadFiles(Array.from(event.target.files || []), "object_main")
+                uploadFiles(Array.from(event.target.files || []), "travel_scene")
               }
             />
             <span>▣</span>
-            <strong>拍摄 / 上传</strong>
+            <strong>旅行照片</strong>
           </label>
           <label>
             <input
@@ -2430,11 +2441,11 @@ export default function ArchiveApp() {
               accept="image/*"
               multiple
               onChange={(event) =>
-                uploadFiles(Array.from(event.target.files || []), "label")
+                uploadFiles(Array.from(event.target.files || []), "architecture")
               }
             />
-            <span>牌</span>
-            <strong>拍铭牌</strong>
+            <span>建</span>
+            <strong>街景 / 建筑</strong>
           </label>
           <button
             onClick={() => {
@@ -2452,7 +2463,7 @@ export default function ArchiveApp() {
             }}
           >
             <span>＋</span>
-            <strong>新建作品</strong>
+            <strong>新建对象</strong>
           </button>
           <button
             className={highlightNext ? "highlighted" : ""}
@@ -2504,7 +2515,7 @@ export default function ArchiveApp() {
         <aside className="side-nav">
           <button className="brand" onClick={() => setView("home")}>
             <span>观迹</span>
-            <small>Museum Log</small>
+            <small>Travel & City Log</small>
           </button>
           <nav aria-label="主导航">
             {mainNav.map(([id, label, mark]) => (
@@ -2524,7 +2535,7 @@ export default function ArchiveApp() {
           </nav>
           <button className="side-start" onClick={() => setModal("start")}>
             <i>＋</i>
-            <span>开始参观</span>
+            <span>开始记录</span>
           </button>
           <div className="owner-note">
             <span className={online ? "online" : "local-only"} />
@@ -2542,7 +2553,7 @@ export default function ArchiveApp() {
         <nav className="mobile-nav" aria-label="移动端主导航">
           {[
             ["home", "首页", "⌂"],
-            ["visits", "参观", "日"],
+            ["visits", "到访", "日"],
             ["inbox", "收件箱", "收"],
             ["archive", "档案", "藏"],
             ["search", "搜索", "⌕"],
@@ -2560,7 +2571,7 @@ export default function ArchiveApp() {
           <button
             className="mobile-start"
             onClick={() => (activeVisit ? setView("live") : setModal("start"))}
-            aria-label={activeVisit ? "继续参观" : "开始参观"}
+            aria-label={activeVisit ? "继续记录" : "开始记录"}
           >
             ＋
           </button>
@@ -2568,7 +2579,7 @@ export default function ArchiveApp() {
       ) : null}
 
       {modal === "start" ? (
-        <Modal title="开始一次参观" eyebrow="十秒进入现场模式" onClose={() => setModal("")}>
+        <Modal title="开始一次到访" eyebrow="十秒进入旅行与城市记录模式" onClose={() => setModal("")}>
           <form className="modal-form" onSubmit={startVisit}>
             <Field label="选择已有地点">
               <select name="venue_id" defaultValue="">
@@ -2582,11 +2593,11 @@ export default function ArchiveApp() {
             </Field>
             <div className="form-separator"><span>或快速新建</span></div>
             <Field label="地点名称">
-              <input name="venue_name" placeholder="例如：山西博物院" />
+              <input name="venue_name" placeholder="例如：山西博物院、建国门街区或阿那亚海边" />
             </Field>
             <div className="form-row">
               <Field label="地点类型">
-                <select name="venue_type" defaultValue="博物馆">
+                <select name="venue_type" defaultValue="城市街区">
                   <option>博物馆</option>
                   <option>美术馆</option>
                   <option>艺术中心</option>
@@ -2600,6 +2611,13 @@ export default function ArchiveApp() {
                   <option>园林</option>
                   <option>古建筑</option>
                   <option>考古现场</option>
+                  <option>城市街区</option>
+                  <option>城市街道</option>
+                  <option>城市地标</option>
+                  <option>咖啡馆或餐馆</option>
+                  <option>市场或商店</option>
+                  <option>公园或自然地点</option>
+                  <option>交通枢纽</option>
                   <option>其他文化地点</option>
                 </select>
               </Field>
@@ -2633,14 +2651,14 @@ export default function ArchiveApp() {
             </Field>
             <p className="form-note">日期和开始时间会自动记录，其他资料以后再补。</p>
             <button className="primary large" type="submit" disabled={busy}>
-              立即进入现场模式 →
+              立即开始记录 →
             </button>
           </form>
         </Modal>
       ) : null}
 
       {modal === "history" ? (
-        <Modal title="快速补录历史参观" eyebrow="日期不完整也可以" onClose={() => setModal("")}>
+        <Modal title="快速补录历史到访" eyebrow="日期不完整也可以" onClose={() => setModal("")}>
           <form
             className="modal-form"
             onSubmit={async (event) => {
@@ -2678,7 +2696,7 @@ export default function ArchiveApp() {
                 <input name="visit_date" placeholder="2022-10-03 / 2022-10 / 2022" required />
               </Field>
             </div>
-            <Field label="展览（可空）"><input name="exhibition_title" /></Field>
+              <Field label="展览（可空）"><input name="exhibition_title" placeholder="不是展览可留空" /></Field>
             <Field label="一句话说明（可空）"><textarea name="one_sentence_summary" rows={3} /></Field>
             <Field label="标签（逗号分隔）"><input name="tags" placeholder="山西, 彩塑, 想再看" /></Field>
             <button className="primary large" disabled={busy}>保存历史参观</button>
@@ -2699,7 +2717,7 @@ export default function ArchiveApp() {
             <Field label="中文名称"><input name="name" required /></Field>
             <Field label="原文名称"><input name="original_name" /></Field>
             <div className="form-row">
-              <Field label="类型"><input name="venue_type" defaultValue="博物馆" /></Field>
+              <Field label="类型"><input name="venue_type" defaultValue="城市街区" /></Field>
               <Field label="城市"><input name="city" required /></Field>
               <Field label="国家"><input name="country" defaultValue="中国" required /></Field>
             </div>
@@ -2762,7 +2780,7 @@ export default function ArchiveApp() {
               setModal("");
             }}
           >
-            <Field label="旅程名称"><input name="name" placeholder="2026 河南博物馆与遗址" required /></Field>
+            <Field label="旅程名称"><input name="name" placeholder="2026 山西城市、建筑与古迹漫游" required /></Field>
             <div className="form-row">
               <Field label="状态">
                 <select name="status"><option>构想中</option><option>计划中</option><option>进行中</option><option>已完成</option></select>
@@ -2783,8 +2801,8 @@ export default function ArchiveApp() {
 
       {modal === "object" ? (
         <Modal
-          title={pendingGroupId ? "从照片组创建对象" : "新建现场对象"}
-          eyebrow={pendingGroupId ? "主图、局部与铭牌保持成组" : "现场只填必要信息"}
+          title={pendingGroupId ? "从照片组创建观察对象" : "新建观察对象"}
+          eyebrow={pendingGroupId ? "街景、细部、展品与说明保持成组" : "现场只填必要信息"}
           onClose={() => {
             setModal("");
             setPendingGroupId("");
@@ -2793,7 +2811,7 @@ export default function ArchiveApp() {
         >
           <form className="modal-form object-form" onSubmit={createObject}>
             <Field label="名称">
-              <input name="title" placeholder="不知道时可写“未命名对象”" defaultValue="未命名对象" />
+              <input name="title" placeholder="例如：西安城墙南门、转角咖啡馆或未命名对象" defaultValue="未命名对象" />
             </Field>
             <div className="form-row">
               <Field label="对象类型">
@@ -2814,20 +2832,20 @@ export default function ArchiveApp() {
             </div>
             <div className="form-row">
               <Field label="材料"><input name="material" /></Field>
-              <Field label="展厅 / 位置"><input name="gallery_or_room" /></Field>
+              <Field label="位置 / 街区"><input name="gallery_or_room" /></Field>
             </div>
             <Field label="现场观察"><textarea name="personal_observation" rows={4} /></Field>
-            <Field label="铭牌文字"><textarea name="label_transcription" rows={4} /></Field>
+            <Field label="现场文字 / 标识"><textarea name="label_transcription" rows={4} /></Field>
             <Field label="后续研究"><textarea name="research_notes" rows={4} /></Field>
-            <button className="primary large" disabled={busy}>保存对象记录</button>
+            <button className="primary large" disabled={busy}>保存观察对象</button>
           </form>
         </Modal>
       ) : null}
 
       {modal === "end" && activeVisit ? (
-        <Modal title="结束这次参观" eyebrow="所有内容都可以跳过" onClose={() => setModal("")}>
+        <Modal title="结束这次记录" eyebrow="所有内容都可以跳过" onClose={() => setModal("")}>
           <div className="visit-summary">
-            <div><strong>{durationText(elapsedMinutes)}</strong><span>参观时长</span></div>
+            <div><strong>{durationText(elapsedMinutes)}</strong><span>停留时长</span></div>
             <div><strong>{visitPhotos(activeVisit.id).length}</strong><span>照片</span></div>
             <div><strong>{activeCaptures.length}</strong><span>快速记录</span></div>
             <div><strong>{activeCaptures.filter((item) => item.processing_status !== "已整理").length}</strong><span>待整理</span></div>

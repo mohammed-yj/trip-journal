@@ -8,6 +8,11 @@ import {
 } from "../../../db/archive";
 
 const captureTypeByPhoto: Record<string, string> = {
+  travel_scene: "旅行与城市照片",
+  street: "街景照片",
+  landscape: "自然景观照片",
+  food: "饮食与日常照片",
+  transport: "交通与路途照片",
   object_main: "作品照片",
   object_detail: "局部照片",
   label: "铭牌照片",
@@ -89,7 +94,7 @@ export async function POST(request: Request) {
           .bind(
             captureId,
             visitId,
-            captureTypeByPhoto[photoType] ?? "作品照片",
+            captureTypeByPhoto[photoType] ?? "旅行照片",
             photoId,
             exhibitionId || null,
             timestamp,
