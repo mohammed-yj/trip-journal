@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("defines the private Travel & City Log application shell", async () => {
+test("defines the private field archive application shell", async () => {
   const [page, layout, app] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
@@ -14,7 +14,7 @@ test("defines the private Travel & City Log application shell", async () => {
   assert.match(layout, /观迹 · 旅行与城市观察档案/);
   assert.match(layout, /robots:\s*\{\s*index:\s*false,\s*follow:\s*false\s*\}/);
   assert.match(app, /正在打开你的私人档案/);
-  assert.match(app, /Travel & City Log/);
+  assert.match(app, /Private Field Archive/);
   assert.match(app, /role="status"/);
   assert.doesNotMatch(`${page}\n${layout}\n${app}`, /codex-preview|react-loading-skeleton/i);
 });

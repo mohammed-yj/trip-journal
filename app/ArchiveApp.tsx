@@ -50,15 +50,15 @@ const EMPTY: Snapshot = {
 };
 
 const mainNav = [
-  ["home", "首页", "⌂"],
-  ["visits", "到访", "日"],
-  ["places", "地点", "所"],
-  ["exhibitions", "展览", "展"],
-  ["objects", "观察对象", "物"],
-  ["inbox", "整理收件箱", "收"],
-  ["trips", "旅程", "行"],
-  ["search", "搜索", "⌕"],
-  ["data", "设置与数据", "据"],
+  ["home", "概览", "01"],
+  ["visits", "到访", "02"],
+  ["places", "地点", "03"],
+  ["exhibitions", "展览", "04"],
+  ["objects", "观察对象", "05"],
+  ["inbox", "整理收件箱", "06"],
+  ["trips", "旅程", "07"],
+  ["search", "搜索", "08"],
+  ["data", "设置与数据", "09"],
 ] as const;
 
 const photoLabels: Record<string, string> = {
@@ -733,9 +733,9 @@ export default function ArchiveApp() {
               weekday: "long",
             }).format(new Date())}
           </p>
-          <h1>今天看见什么？</h1>
+          <h1>旅行与城市观察</h1>
           <p className="lede">
-            一次旅行、一段街道或一件展品，都可以先记下，回家再慢慢整理。
+            记录到访、街道、建筑、展览与所见之物，形成可检索、可迁移的私人档案。
           </p>
         </div>
         <button
@@ -746,8 +746,8 @@ export default function ArchiveApp() {
           }}
           data-testid="start-visit"
         >
-          <span>{activeVisit ? "继续" : "开始"}</span>
-          <strong>{activeVisit ? "继续这次记录" : "开始记录"}</strong>
+          <span>{activeVisit ? "当前记录" : "快速入口"}</span>
+          <strong>{activeVisit ? "继续这次记录" : "新建到访记录"}</strong>
           <i>→</i>
         </button>
       </header>
@@ -2515,7 +2515,7 @@ export default function ArchiveApp() {
         <aside className="side-nav">
           <button className="brand" onClick={() => setView("home")}>
             <span>观迹</span>
-            <small>Travel & City Log</small>
+            <small>Private Field Archive</small>
           </button>
           <nav aria-label="主导航">
             {mainNav.map(([id, label, mark]) => (
@@ -2552,11 +2552,11 @@ export default function ArchiveApp() {
       {view !== "live" ? (
         <nav className="mobile-nav" aria-label="移动端主导航">
           {[
-            ["home", "首页", "⌂"],
-            ["visits", "到访", "日"],
-            ["inbox", "收件箱", "收"],
-            ["archive", "档案", "藏"],
-            ["search", "搜索", "⌕"],
+            ["home", "概览", "01"],
+            ["visits", "到访", "02"],
+            ["inbox", "收件箱", "06"],
+            ["archive", "档案", "A"],
+            ["search", "搜索", "08"],
           ].map(([id, label, mark]) => (
             <button
               key={id}
