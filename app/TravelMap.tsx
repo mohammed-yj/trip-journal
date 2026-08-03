@@ -592,7 +592,11 @@ export default function TravelMap({
   };
 
   return (
-    <section className="travel-map-card" aria-label={l.title}>
+    <section
+      className="travel-map-card"
+      aria-label={l.title}
+      data-map-release="adm1-rings-v1"
+    >
       <div className="travel-map-head">
         <div>
           <p className="eyebrow">{l.eyebrow}</p>
@@ -628,6 +632,8 @@ export default function TravelMap({
                         key={`${code || "feature"}-${index}`}
                         d={path(item) || undefined}
                         className={`map-country map-color-${worldColors[index] ?? index % 4} ${visitedCountries.has(code) ? "is-visited" : ""}`}
+                        data-country-code={code}
+                        aria-label={name}
                         role="button"
                         tabIndex={0}
                         onClick={() => {
@@ -670,6 +676,8 @@ export default function TravelMap({
                           key={`${code}-${index}`}
                           d={path(item) || undefined}
                           className={`map-country map-admin map-color-${adminColors[index] ?? index % 4} ${isVisited ? "is-visited" : ""}`}
+                          data-admin-code={code}
+                          aria-label={name}
                           onPointerEnter={() => setHoveredFeature(item)}
                           onPointerLeave={() => setHoveredFeature(null)}
                         >

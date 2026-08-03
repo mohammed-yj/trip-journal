@@ -2,6 +2,7 @@ import countryCodes from "i18n-iso-countries/codes.json";
 import enCountries from "i18n-iso-countries/langs/en.json";
 import frCountries from "i18n-iso-countries/langs/fr.json";
 import zhCountries from "i18n-iso-countries/langs/zh.json";
+import { geoArea } from "d3-geo";
 import type { Locale } from "./i18n";
 
 type CountryLabel = string | string[];
@@ -131,6 +132,44 @@ export function countryOptions(locale: Locale) {
 
 export type AdminFeature = GeoJSON.Feature<GeoJSON.Geometry, Record<string, unknown>>;
 
+function orientRingForD3(ring: GeoJSON.Position[], exterior: boolean) {
+  // RFC 7946 and d3-geo use opposite winding for spherical polygon exteriors.
+  // geoArea also stays reliable for regions split across the antimeridian.
+  const sphericalArea = geoArea({
+    type: "Polygon",
+    coordinates: [ring],
+  });
+  const drawsSmallerSide = sphericalArea <= Math.PI * 2;
+  const hasExpectedOrientation = exterior ? drawsSmallerSide : !drawsSmallerSide;
+  return hasExpectedOrientation ? ring : [...ring].reverse();
+}
+
+function orientPolygonForD3(polygon: GeoJSON.Position[][]) {
+  return polygon.map((ring, index) => orientRingForD3(ring, index === 0));
+}
+
+export function orientAdminFeatureForD3(feature: AdminFeature): AdminFeature {
+  if (feature.geometry.type === "Polygon") {
+    return {
+      ...feature,
+      geometry: {
+        ...feature.geometry,
+        coordinates: orientPolygonForD3(feature.geometry.coordinates),
+      },
+    };
+  }
+  if (feature.geometry.type === "MultiPolygon") {
+    return {
+      ...feature,
+      geometry: {
+        ...feature.geometry,
+        coordinates: feature.geometry.coordinates.map(orientPolygonForD3),
+      },
+    };
+  }
+  return feature;
+}
+
 export function adminFeatureName(feature: AdminFeature) {
   return String(feature.properties?.shapeName || feature.properties?.reg_name || "");
 }
@@ -161,7 +200,7 @@ export async function loadAdminFeatures(code: string): Promise<AdminFeature[]> {
     const { feature } = await import("topojson-client");
     const object = json.objects[Object.keys(json.objects)[0]];
     const collection = feature(json, object) as unknown as GeoJSON.FeatureCollection;
-    return collection.features as AdminFeature[];
+    return (collection.features as AdminFeature[]).map(orientAdminFeatureForD3);
   }
-  return (json.features || []) as AdminFeature[];
+  return ((json.features || []) as AdminFeature[]).map(orientAdminFeatureForD3);
 }

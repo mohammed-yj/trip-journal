@@ -104,6 +104,8 @@ test("provides a persistent hierarchical travel footprint map", async () => {
   assert.match(map, /onPointerMove=\{moveDrag\}/);
   assert.match(map, /className="map-hover-outline"/);
   assert.match(map, /className="map-selected-outline"/);
+  assert.match(map, /data-map-release="adm1-rings-v1"/);
+  assert.match(map, /data-country-code=\{code\}/);
   assert.match(styles, /\.map-zoom-control/);
   assert.match(styles, /\.map-country\.map-color-3/);
   assert.match(styles, /\.map-hover-outline/);
@@ -112,6 +114,9 @@ test("provides a persistent hierarchical travel footprint map", async () => {
   assert.match(mapData, /"CHN"[\s\S]*"USA"[\s\S]*"RUS"[\s\S]*"GBR"/);
   assert.match(mapData, /"FRA"[\s\S]*"DEU"[\s\S]*"ITA"[\s\S]*"JPN"/);
   assert.match(mapData, /CHN:\s*"\/maps\/admin1\/CHN\.json"/);
+  assert.match(mapData, /geoArea/);
+  assert.match(mapData, /orientAdminFeatureForD3/);
+  assert.match(mapData, /\.map\(orientAdminFeatureForD3\)/);
   assert.match(mapData, /if \(code === "TWN"\) return TAIWAN_NAMES/);
   assert.match(archive, /action === "addMapMark"/);
   assert.match(archive, /ON CONFLICT\(mark_key\)/);
