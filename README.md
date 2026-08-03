@@ -2,6 +2,8 @@
 
 中文 · [English](#english) · [Français](#français)
 
+![观迹首页预览 · Guanji home preview · Aperçu de l’accueil de Guanji](docs/readme-preview.jpg)
+
 一个移动端优先、默认私有的旅行、城市、建筑、街景与博物馆观察档案。界面支持中文、英语和法语；第一次打开使用中文，之后会在当前浏览器中记住上次选择的语言。
 
 > 这个项目不依赖 Codex 容器，也不需要 Docker。fork 或 clone 后，可直接使用 Node.js 在普通电脑上运行。
