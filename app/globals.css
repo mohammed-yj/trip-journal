@@ -3220,6 +3220,21 @@ img {
   stroke-dasharray: 3 2;
 }
 
+.map-territory {
+  stroke-width: 1.05;
+}
+
+.map-country-jump select {
+  min-width: 176px;
+  border: 1px solid color-mix(in srgb, var(--accent-dark) 30%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--surface) 94%, var(--accent-light));
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0.42rem 0.55rem;
+}
+
 .map-pin circle:first-child {
   fill: color-mix(in srgb, var(--surface) 72%, transparent);
   stroke: var(--accent-dark);

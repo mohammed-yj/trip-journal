@@ -36,6 +36,25 @@ export const DETAILED_COUNTRIES = new Set([
   "JPN",
 ]);
 
+/**
+ * Territories drawn as separate world features.  Their parent detail maps keep
+ * them available after the initial mainland-focused view, instead of treating
+ * an administrative zoom as a cropped map.
+ */
+export const DETAIL_TERRITORY_CODES: Record<string, string[]> = {
+  CHN: ["HKG", "MAC"],
+  USA: ["ASM", "GUM", "MNP", "PRI", "UMI", "VIR"],
+  GBR: [
+    "AIA", "BMU", "CYM", "FLK", "GGY", "GIB", "IMN", "IOT", "JEY",
+    "MSR", "PCN", "SHN", "SGS", "TCA", "VGB",
+  ],
+  FRA: ["ATF", "BLM", "MAF", "NCL", "PYF", "SPM", "WLF"],
+};
+
+export function detailTerritoryCodes(countryCode: string) {
+  return DETAIL_TERRITORY_CODES[countryCode] || [];
+}
+
 export const ADMIN1_FILES: Record<string, string> = {
   CHN: "/maps/admin1/CHN.json",
   USA: "/maps/admin1/USA.json",

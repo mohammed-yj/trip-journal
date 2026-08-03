@@ -9,7 +9,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { geoMercator, geoNaturalEarth1, geoPath, type GeoProjection } from "d3-geo";
+import {
+  geoMercator,
+  geoNaturalEarth1,
+  geoPath,
+  type GeoProjection,
+} from "d3-geo";
 import { feature, neighbors } from "topojson-client";
 import type { Locale } from "./i18n";
 import LocationPicker from "./LocationPicker";
@@ -19,6 +24,7 @@ import {
   adminFeatureName,
   countryName,
   DETAILED_COUNTRIES,
+  detailTerritoryCodes,
   loadAdminFeatures,
   normalizeAdminName,
   resolveCountryCode,
@@ -62,6 +68,8 @@ type WorldFeature = GeoJSON.Feature<GeoJSON.Geometry, { name?: string }> & {
 
 const ZOOM_LEVELS = [1, 2, 4, 8] as const;
 
+const DETAIL_HOME_SIZE = [836, 424] as const;
+
 const DETAIL_FOCUS_BOUNDS: Record<
   string,
   [west: number, south: number, east: number, north: number]
@@ -92,6 +100,43 @@ function focusFeature(
   };
 }
 
+function clampPanForZoom(
+  next: { x: number; y: number },
+  nextZoom: number,
+) {
+  const maxX = Math.max(0, 500 * (nextZoom - 1));
+  const maxY = Math.max(0, 270 * (nextZoom - 1));
+  return {
+    x: Math.max(-maxX, Math.min(maxX, next.x)),
+    y: Math.max(-maxY, Math.min(maxY, next.y)),
+  };
+}
+
+function detailHomeCamera(
+  path: ReturnType<typeof geoPath>,
+  bounds: [number, number, number, number],
+) {
+  const [[left, top], [right, bottom]] = path.bounds(focusFeature(bounds));
+  const width = Math.max(1, right - left);
+  const height = Math.max(1, bottom - top);
+  const desiredZoom = Math.min(
+    DETAIL_HOME_SIZE[0] / width,
+    DETAIL_HOME_SIZE[1] / height,
+  );
+  const zoom =
+    ZOOM_LEVELS.find((level) => level >= Math.max(1, desiredZoom)) ||
+    ZOOM_LEVELS[ZOOM_LEVELS.length - 1];
+  const centerX = (left + right) / 2;
+  const centerY = (top + bottom) / 2;
+  return {
+    zoom,
+    pan: clampPanForZoom(
+      { x: -zoom * (centerX - 500), y: -zoom * (centerY - 270) },
+      zoom,
+    ),
+  };
+}
+
 const labels = {
   zh: {
     eyebrow: "足迹地图",
@@ -117,6 +162,7 @@ const labels = {
     manual: "手动添加",
     remove: "移除",
     source: "地图：Natural Earth；行政区：geoBoundaries / ISTAT",
+    jump: "快速定位国家/地区…",
   },
   en: {
     eyebrow: "FOOTPRINT MAP",
@@ -142,6 +188,7 @@ const labels = {
     manual: "Manual",
     remove: "Remove",
     source: "Map: Natural Earth; regions: geoBoundaries / ISTAT",
+    jump: "Find a country or territory…",
   },
   fr: {
     eyebrow: "CARTE DES TRACES",
@@ -167,6 +214,7 @@ const labels = {
     manual: "Manuel",
     remove: "Retirer",
     source: "Carte : Natural Earth ; régions : geoBoundaries / ISTAT",
+    jump: "Trouver un pays ou territoire…",
   },
 } as const;
 
@@ -357,6 +405,7 @@ export default function TravelMap({
   const suppressClickRef = useRef(false);
   const mapSvgRef = useRef<SVGSVGElement>(null);
   const lastWheelAtRef = useRef(Number.NEGATIVE_INFINITY);
+  const detailHomeRef = useRef("");
 
   useEffect(() => {
     let cancelled = false;
@@ -428,6 +477,18 @@ export default function TravelMap({
   const selectedWorldFeature = selectedCountry
     ? worldFeatures.find((item) => worldCode(item) === selectedCountry)
     : undefined;
+  const detailTerritoryFeatures = useMemo(() => {
+    if (!selectedCountry) return [];
+    const territoryCodes = new Set(detailTerritoryCodes(selectedCountry));
+    return worldFeatures.filter((item) => territoryCodes.has(worldCode(item)));
+  }, [selectedCountry, worldFeatures]);
+  const detailProjectionFeatures = useMemo(
+    () =>
+      selectedWorldFeature
+        ? [selectedWorldFeature, ...detailTerritoryFeatures]
+        : [],
+    [selectedWorldFeature, detailTerritoryFeatures],
+  );
   const selectedWorldIndex = selectedWorldFeature
     ? worldFeatures.indexOf(selectedWorldFeature)
     : -1;
@@ -441,15 +502,14 @@ export default function TravelMap({
     if (selectedCountry && selectedWorldFeature) {
       const details: GeoJSON.FeatureCollection = {
         type: "FeatureCollection",
-        features: adminFeatures.length ? adminFeatures : [selectedWorldFeature],
+        features: detailProjectionFeatures,
       };
-      const focusBounds = DETAIL_FOCUS_BOUNDS[selectedCountry];
       next = geoMercator().fitExtent(
         [
           [34, 34],
           [966, 506],
         ],
-        focusBounds ? focusFeature(focusBounds) : details,
+        details,
       );
     } else {
       const collection: GeoJSON.FeatureCollection = {
@@ -465,9 +525,41 @@ export default function TravelMap({
       );
     }
     return next;
-  }, [worldFeatures, selectedCountry, selectedWorldFeature, adminFeatures]);
+  }, [worldFeatures, selectedCountry, selectedWorldFeature, detailProjectionFeatures]);
 
   const path = useMemo(() => geoPath(projection), [projection]);
+  const initialDetailCamera = useMemo(() => {
+    const focusBounds = DETAIL_FOCUS_BOUNDS[selectedCountry];
+    return selectedCountry && adminFeatures.length && focusBounds
+      ? detailHomeCamera(path, focusBounds)
+      : null;
+  }, [selectedCountry, adminFeatures.length, path]);
+  const countryJumpOptions = useMemo(
+    () =>
+      worldFeatures
+        .map((item) => {
+          const code = worldCode(item);
+          return {
+            code,
+            name: worldFeatureName(code, item.properties?.name, locale),
+          };
+        })
+        .filter((item) => item.code)
+        .sort((left, right) => left.name.localeCompare(right.name, locale)),
+    [worldFeatures, locale],
+  );
+
+  useEffect(() => {
+    detailHomeRef.current = "";
+  }, [selectedCountry]);
+
+  useEffect(() => {
+    if (!selectedCountry || !initialDetailCamera) return;
+    if (detailHomeRef.current === selectedCountry) return;
+    detailHomeRef.current = selectedCountry;
+    setZoom(initialDetailCamera.zoom);
+    setPan(initialDetailCamera.pan);
+  }, [selectedCountry, initialDetailCamera]);
   const adminColors = useMemo(
     () => fourColorGraph(featureAdjacency(adminFeatures)),
     [adminFeatures],
@@ -482,6 +574,7 @@ export default function TravelMap({
   const manualMarks = mapMarks.filter((mark) => mark.source_type === "manual");
 
   const reset = () => {
+    detailHomeRef.current = "";
     setSelectedCountry("");
     setAdminFeatures([]);
     setHoveredFeature(null);
@@ -490,12 +583,7 @@ export default function TravelMap({
   };
 
   const clampPan = (next: { x: number; y: number }, nextZoom = zoom) => {
-    const maxX = Math.max(0, 500 * (nextZoom - 1));
-    const maxY = Math.max(0, 270 * (nextZoom - 1));
-    return {
-      x: Math.max(-maxX, Math.min(maxX, next.x)),
-      y: Math.max(-maxY, Math.min(maxY, next.y)),
-    };
+    return clampPanForZoom(next, nextZoom);
   };
 
   const changeZoom = (direction: -1 | 1) => {
@@ -511,6 +599,7 @@ export default function TravelMap({
 
   const selectCountry = (code: string) => {
     if (!code) return;
+    detailHomeRef.current = "";
     setHoveredFeature(null);
     setSelectedCountry(code);
     setAdminFeatures([]);
@@ -605,7 +694,7 @@ export default function TravelMap({
     <section
       className="travel-map-card"
       aria-label={l.title}
-      data-map-release="map-final-v4"
+      data-map-release="map-final-v5"
     >
       <div className="travel-map-head">
         <div>
@@ -613,6 +702,23 @@ export default function TravelMap({
           <h2>{selectedCountry ? countryName(selectedCountry, locale) : l.title}</h2>
           <p>{l.subtitle}</p>
         </div>
+        {!selectedCountry ? (
+          <label className="map-country-jump">
+            <span className="sr-only">{l.jump}</span>
+            <select
+              value=""
+              onChange={(event) => selectCountry(event.target.value)}
+              aria-label={l.jump}
+            >
+              <option value="">{l.jump}</option>
+              {countryJumpOptions.map((item) => (
+                <option key={item.code} value={item.code}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
       </div>
 
       <div className={`travel-map-canvas ${dragging ? "is-dragging" : ""}`}>
@@ -670,7 +776,36 @@ export default function TravelMap({
                       </path>
                     );
                   })
-                : adminFeatures.length
+                : null}
+              {selectedCountry && selectedWorldFeature ? (
+                <>
+                  <path
+                    d={path(selectedWorldFeature) || undefined}
+                    className={`map-country map-territory map-color-${selectedWorldColor} ${visitedCountries.has(selectedCountry) ? "is-visited" : ""}`}
+                    onPointerMove={() => setHoveredFeature(selectedWorldFeature)}
+                    onPointerLeave={() => setHoveredFeature(null)}
+                  >
+                    <title>{countryName(selectedCountry, locale)}</title>
+                  </path>
+                  {detailTerritoryFeatures.map((item, index) => {
+                    const code = worldCode(item);
+                    return (
+                      <path
+                        key={`territory-${code}-${index}`}
+                        d={path(item) || undefined}
+                        className={`map-country map-territory map-color-${(selectedWorldColor + index + 1) % 4} ${visitedCountries.has(selectedCountry) || visitedCountries.has(code) ? "is-visited" : ""}`}
+                        data-country-code={code}
+                        aria-label={worldFeatureName(code, item.properties?.name, locale)}
+                        onPointerMove={() => setHoveredFeature(item)}
+                        onPointerLeave={() => setHoveredFeature(null)}
+                      >
+                        <title>{worldFeatureName(code, item.properties?.name, locale)}</title>
+                      </path>
+                    );
+                  })}
+                </>
+              ) : null}
+              {selectedCountry && adminFeatures.length
                   ? adminFeatures.map((item, index) => {
                       const code = adminFeatureCode(item);
                       const name = adminFeatureName(item, locale);
@@ -699,18 +834,7 @@ export default function TravelMap({
                         </path>
                       );
                     })
-                  : selectedWorldFeature
-                    ? (
-                        <path
-                          d={path(selectedWorldFeature) || undefined}
-                          className={`map-country map-color-${selectedWorldColor} ${visitedCountries.has(selectedCountry) ? "is-visited" : ""}`}
-                          onPointerMove={() => setHoveredFeature(selectedWorldFeature)}
-                          onPointerLeave={() => setHoveredFeature(null)}
-                        >
-                          <title>{countryName(selectedCountry, locale)}</title>
-                        </path>
-                      )
-                    : null}
+                  : null}
 
               {visiblePins.map((pin, index) => {
                 const point = projection([Number(pin.longitude), Number(pin.latitude)]);
@@ -723,19 +847,27 @@ export default function TravelMap({
                   </g>
                 );
               })}
+              {selectedWorldFeature ? (
+                <path
+                  key="selected-outline"
+                  d={path(selectedWorldFeature) || undefined}
+                  className="map-selected-outline"
+                  aria-hidden="true"
+                />
+              ) : null}
+              {detailTerritoryFeatures.map((item, index) => (
+                <path
+                  key={`territory-outline-${worldCode(item)}-${index}`}
+                  d={path(item) || undefined}
+                  className="map-selected-outline"
+                  aria-hidden="true"
+                />
+              ))}
               {selectedAdminBoundary ? (
                 <path
                   key="admin-outer-outline"
                   d={path(selectedAdminBoundary) || undefined}
                   className="map-admin-outer-outline"
-                  aria-hidden="true"
-                />
-              ) : null}
-              {selectedWorldFeature && !adminFeatures.length ? (
-                <path
-                  key="selected-outline"
-                  d={path(selectedWorldFeature) || undefined}
-                  className="map-selected-outline"
                   aria-hidden="true"
                 />
               ) : null}

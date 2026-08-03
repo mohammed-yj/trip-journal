@@ -107,7 +107,7 @@ test("provides a persistent hierarchical travel footprint map", async () => {
   assert.match(map, /onPointerMove=\{moveDrag\}/);
   assert.match(map, /className="map-hover-outline"/);
   assert.match(map, /className="map-selected-outline"/);
-  assert.match(map, /data-map-release="map-final-v4"/);
+  assert.match(map, /data-map-release="map-final-v5"/);
   assert.match(map, /data-country-code=\{code\}/);
   assert.match(map, /const ZOOM_LEVELS = \[1, 2, 4, 8\]/);
   assert.match(map, /DETAIL_FOCUS_BOUNDS/);
@@ -118,7 +118,9 @@ test("provides a persistent hierarchical travel footprint map", async () => {
   assert.match(map, /clearHoverOutsideMap/);
   assert.match(map, /className="map-admin-outer-outline"/);
   assert.match(map, /adminOuterBoundary\(adminFeatures/);
-  assert.match(map, /selectedWorldFeature && !adminFeatures\.length/);
+  assert.match(map, /detailTerritoryFeatures/);
+  assert.match(map, /detailHomeCamera/);
+  assert.match(map, /className="map-country-jump"/);
   assert.match(map, /lastWheelAtRef/);
   assert.match(styles, /\.map-admin-outer-outline/);
   assert.match(styles, /\.map-zoom-control/);
@@ -126,6 +128,7 @@ test("provides a persistent hierarchical travel footprint map", async () => {
   assert.match(styles, /\.map-hover-outline/);
   assert.match(styles, /\.map-selected-outline/);
   assert.match(styles, /\.map-admin:not\(\.is-visited\)/);
+  assert.match(styles, /\.map-country-jump select/);
   assert.match(mapData, /"CHN"[\s\S]*"USA"[\s\S]*"RUS"[\s\S]*"GBR"/);
   assert.match(mapData, /"FRA"[\s\S]*"DEU"[\s\S]*"ITA"[\s\S]*"JPN"/);
   assert.match(mapData, /CHN:\s*"\/maps\/admin1\/CHN\.json"/);
@@ -134,6 +137,11 @@ test("provides a persistent hierarchical travel footprint map", async () => {
   assert.match(mapData, /\.map\(orientAdminFeatureForD3\)/);
   assert.match(mapData, /if \(code === "TWN"\) return TAIWAN_NAMES/);
   assert.match(mapData, /worldFeatureName/);
+  assert.match(mapData, /DETAIL_TERRITORY_CODES/);
+  assert.match(mapData, /CHN:\s*\["HKG", "MAC"\]/);
+  assert.match(mapData, /USA:\s*\["ASM", "GUM", "MNP", "PRI", "UMI", "VIR"\]/);
+  assert.match(mapData, /GBR:[\s\S]*"GIB"[\s\S]*"VGB"/);
+  assert.match(mapData, /FRA:\s*\["ATF", "BLM", "MAF", "NCL", "PYF", "SPM", "WLF"\]/);
   assert.match(adminLocales, /"Beijing Municipality": "CN-BJ"/);
   assert.match(adminLocales, /if \(shapeIso === "SU-SD"\) return "US-SD"/);
   assert.match(mapLogic, /normalizeMapMarkInput/);
