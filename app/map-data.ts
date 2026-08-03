@@ -30,14 +30,14 @@ export const DETAILED_COUNTRIES = new Set([
 ]);
 
 export const ADMIN1_FILES: Record<string, string> = {
-  CHN: "/maps/admin1/CHN.geojson",
-  USA: "/maps/admin1/USA.geojson",
-  RUS: "/maps/admin1/RUS.geojson",
-  GBR: "/maps/admin1/GBR.geojson",
-  FRA: "/maps/admin1/FRA.geojson",
-  DEU: "/maps/admin1/DEU.geojson",
+  CHN: "/maps/admin1/CHN.json",
+  USA: "/maps/admin1/USA.json",
+  RUS: "/maps/admin1/RUS.json",
+  GBR: "/maps/admin1/GBR.json",
+  FRA: "/maps/admin1/FRA.json",
+  DEU: "/maps/admin1/DEU.json",
   ITA: "/maps/admin1/ITA.topo.json",
-  JPN: "/maps/admin1/JPN.geojson",
+  JPN: "/maps/admin1/JPN.json",
 };
 
 const TAIWAN_NAMES: Record<Locale, string> = {

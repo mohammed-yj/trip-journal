@@ -701,6 +701,13 @@ export default function TravelMap({
                   </g>
                 );
               })}
+              {selectedWorldFeature ? (
+                <path
+                  d={path(selectedWorldFeature) || undefined}
+                  className="map-selected-outline"
+                  aria-hidden="true"
+                />
+              ) : null}
               {hoveredFeature ? (
                 <path
                   d={path(hoveredFeature) || undefined}

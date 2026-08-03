@@ -103,15 +103,34 @@ test("provides a persistent hierarchical travel footprint map", async () => {
   assert.match(map, /worldCode\(item\) === "UKR"/);
   assert.match(map, /onPointerMove=\{moveDrag\}/);
   assert.match(map, /className="map-hover-outline"/);
+  assert.match(map, /className="map-selected-outline"/);
   assert.match(styles, /\.map-zoom-control/);
   assert.match(styles, /\.map-country\.map-color-3/);
   assert.match(styles, /\.map-hover-outline/);
+  assert.match(styles, /\.map-selected-outline/);
   assert.match(styles, /\.map-admin:not\(\.is-visited\)/);
   assert.match(mapData, /"CHN"[\s\S]*"USA"[\s\S]*"RUS"[\s\S]*"GBR"/);
   assert.match(mapData, /"FRA"[\s\S]*"DEU"[\s\S]*"ITA"[\s\S]*"JPN"/);
+  assert.match(mapData, /CHN:\s*"\/maps\/admin1\/CHN\.json"/);
   assert.match(mapData, /if \(code === "TWN"\) return TAIWAN_NAMES/);
   assert.match(archive, /action === "addMapMark"/);
   assert.match(archive, /ON CONFLICT\(mark_key\)/);
   assert.match(migration, /CREATE TABLE `map_marks`/);
   assert.match(world, /"countries"/);
+});
+
+test("ships readable ADM1 JSON for every detailed country", async () => {
+  const detailedCountries = ["CHN", "USA", "RUS", "GBR", "FRA", "DEU", "JPN"];
+  const featureCounts = await Promise.all(
+    detailedCountries.map(async (code) => {
+      const source = await readFile(
+        new URL(`../public/maps/admin1/${code}.json`, import.meta.url),
+        "utf8",
+      );
+      const collection = JSON.parse(source);
+      assert.equal(collection.type, "FeatureCollection");
+      return collection.features.length;
+    }),
+  );
+  featureCounts.forEach((count) => assert.ok(count > 1));
 });
