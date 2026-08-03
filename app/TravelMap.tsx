@@ -1,8 +1,16 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  PointerEvent as ReactPointerEvent,
+  WheelEvent as ReactWheelEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { geoMercator, geoNaturalEarth1, geoPath, type GeoProjection } from "d3-geo";
-import { feature } from "topojson-client";
+import { feature, neighbors } from "topojson-client";
 import type { Locale } from "./i18n";
 import LocationPicker from "./LocationPicker";
 import {
@@ -130,6 +138,50 @@ function markKey(mark: Row) {
   ].join(":");
 }
 
+function fourColorGraph(adjacency: number[][]) {
+  const colors = Array(adjacency.length).fill(-1) as number[];
+
+  const chooseNode = () => {
+    let chosen = -1;
+    let bestSaturation = -1;
+    let bestDegree = -1;
+    for (let node = 0; node < adjacency.length; node += 1) {
+      if (colors[node] !== -1) continue;
+      const saturation = new Set(
+        adjacency[node]
+          .map((neighbor) => colors[neighbor])
+          .filter((color) => color >= 0),
+      ).size;
+      if (
+        saturation > bestSaturation ||
+        (saturation === bestSaturation && adjacency[node].length > bestDegree)
+      ) {
+        chosen = node;
+        bestSaturation = saturation;
+        bestDegree = adjacency[node].length;
+      }
+    }
+    return chosen;
+  };
+
+  const solve = (remaining: number): boolean => {
+    if (!remaining) return true;
+    const node = chooseNode();
+    if (node < 0) return true;
+    const blocked = new Set(adjacency[node].map((neighbor) => colors[neighbor]));
+    for (let color = 0; color < 4; color += 1) {
+      if (blocked.has(color)) continue;
+      colors[node] = color;
+      if (solve(remaining - 1)) return true;
+      colors[node] = -1;
+    }
+    return false;
+  };
+
+  solve(adjacency.length);
+  return colors.map((color, index) => (color < 0 ? index % 4 : color));
+}
+
 export default function TravelMap({
   locale,
   venues,
@@ -142,12 +194,24 @@ export default function TravelMap({
 }: Props) {
   const l = labels[locale];
   const [worldFeatures, setWorldFeatures] = useState<WorldFeature[]>([]);
+  const [worldColors, setWorldColors] = useState<number[]>([]);
   const [selectedCountry, setSelectedCountry] = useState("");
   const [adminFeatures, setAdminFeatures] = useState<AdminFeature[]>([]);
   const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
   const [adding, setAdding] = useState(false);
   const [scope, setScope] = useState("country");
   const [error, setError] = useState("");
+  const dragRef = useRef<{
+    pointerId: number;
+    clientX: number;
+    clientY: number;
+    panX: number;
+    panY: number;
+    moved: boolean;
+  } | null>(null);
+  const suppressClickRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -160,6 +224,9 @@ export default function TravelMap({
           topology.objects.countries,
         ) as unknown as GeoJSON.FeatureCollection;
         setWorldFeatures(collection.features as WorldFeature[]);
+        setWorldColors(
+          fourColorGraph(neighbors(topology.objects.countries.geometries)),
+        );
       })
       .catch(() => setWorldFeatures([]));
     return () => {
@@ -275,6 +342,13 @@ export default function TravelMap({
   const selectedWorldFeature = worldFeatures.find(
     (item) => worldCode(item) === selectedCountry,
   );
+  const selectedWorldIndex = selectedWorldFeature
+    ? worldFeatures.indexOf(selectedWorldFeature)
+    : -1;
+  const selectedWorldColor =
+    selectedWorldIndex >= 0
+      ? (worldColors[selectedWorldIndex] ?? selectedWorldIndex % 4)
+      : 0;
 
   const projection = useMemo(() => {
     let next: GeoProjection;
@@ -321,6 +395,65 @@ export default function TravelMap({
     setSelectedCountry("");
     setAdminFeatures([]);
     setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
+
+  const clampPan = (next: { x: number; y: number }, nextZoom = zoom) => {
+    const maxX = Math.max(0, 500 * (nextZoom - 1));
+    const maxY = Math.max(0, 270 * (nextZoom - 1));
+    return {
+      x: Math.max(-maxX, Math.min(maxX, next.x)),
+      y: Math.max(-maxY, Math.min(maxY, next.y)),
+    };
+  };
+
+  const changeZoom = (delta: number) => {
+    const nextZoom = Math.max(1, Math.min(4, zoom + delta));
+    setZoom(nextZoom);
+    setPan((current) => clampPan(current, nextZoom));
+  };
+
+  const beginDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (zoom <= 1) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      pointerId: event.pointerId,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      panX: pan.x,
+      panY: pan.y,
+      moved: false,
+    };
+    setDragging(true);
+  };
+
+  const moveDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
+    const start = dragRef.current;
+    if (!start || start.pointerId !== event.pointerId) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const deltaX = ((event.clientX - start.clientX) * 1000) / rect.width;
+    const deltaY = ((event.clientY - start.clientY) * 540) / rect.height;
+    if (Math.abs(deltaX) + Math.abs(deltaY) > 4) start.moved = true;
+    setPan(clampPan({ x: start.panX + deltaX, y: start.panY + deltaY }));
+  };
+
+  const endDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
+    const start = dragRef.current;
+    if (!start || start.pointerId !== event.pointerId) return;
+    suppressClickRef.current = start.moved;
+    dragRef.current = null;
+    setDragging(false);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    window.setTimeout(() => {
+      suppressClickRef.current = false;
+    }, 0);
+  };
+
+  const wheelZoom = (event: ReactWheelEvent<SVGSVGElement>) => {
+    event.preventDefault();
+    changeZoom(event.deltaY < 0 ? 0.25 : -0.25);
   };
 
   const submitMark = async (event: FormEvent<HTMLFormElement>) => {
@@ -353,35 +486,26 @@ export default function TravelMap({
           <h2>{selectedCountry ? countryName(selectedCountry, locale) : l.title}</h2>
           <p>{l.subtitle}</p>
         </div>
-        <div className="map-tools" aria-label={l.reset}>
-          {selectedCountry ? (
-            <button type="button" onClick={reset} className="map-world-button">
-              ← {l.world}
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => setZoom((value) => Math.min(3, value + 0.25))}
-            aria-label={l.zoomIn}
-            title={l.zoomIn}
-          >
-            +
-          </button>
-          <button
-            type="button"
-            onClick={() => setZoom((value) => Math.max(0.75, value - 0.25))}
-            aria-label={l.zoomOut}
-            title={l.zoomOut}
-          >
-            −
-          </button>
-        </div>
       </div>
 
-      <div className="travel-map-canvas">
+      <div className={`travel-map-canvas ${dragging ? "is-dragging" : ""}`}>
+        {selectedCountry ? (
+          <button type="button" onClick={reset} className="map-world-button">
+            ← {l.world}
+          </button>
+        ) : null}
         {worldFeatures.length ? (
-          <svg viewBox="0 0 1000 540" role="img" aria-label={l.title}>
-            <g transform={`translate(${500 * (1 - zoom)} ${270 * (1 - zoom)}) scale(${zoom})`}>
+          <svg
+            viewBox="0 0 1000 540"
+            role="img"
+            aria-label={l.title}
+            onPointerDown={beginDrag}
+            onPointerMove={moveDrag}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+            onWheel={wheelZoom}
+          >
+            <g transform={`translate(${pan.x} ${pan.y}) translate(500 270) scale(${zoom}) translate(-500 -270)`}>
               {!selectedCountry
                 ? worldFeatures.map((item, index) => {
                     const code = worldCode(item);
@@ -390,20 +514,22 @@ export default function TravelMap({
                       <path
                         key={`${code || "feature"}-${index}`}
                         d={path(item) || undefined}
-                        className={`map-country ${visitedCountries.has(code) ? "is-visited" : ""}`}
+                        className={`map-country map-color-${worldColors[index] ?? index % 4} ${visitedCountries.has(code) ? "is-visited" : ""}`}
                         role="button"
                         tabIndex={0}
                         onClick={() => {
-                          if (!code) return;
+                          if (!code || suppressClickRef.current) return;
                           setSelectedCountry(code);
                           setAdminFeatures([]);
                           setZoom(1);
+                          setPan({ x: 0, y: 0 });
                         }}
                         onKeyDown={(event) => {
                           if ((event.key === "Enter" || event.key === " ") && code) {
                             setSelectedCountry(code);
                             setAdminFeatures([]);
                             setZoom(1);
+                            setPan({ x: 0, y: 0 });
                           }
                         }}
                       >
@@ -424,7 +550,7 @@ export default function TravelMap({
                         <path
                           key={`${code}-${index}`}
                           d={path(item) || undefined}
-                          className={`map-country map-admin ${isVisited ? "is-visited" : ""}`}
+                          className={`map-country map-admin map-color-${index % 4} ${isVisited ? "is-visited" : ""}`}
                         >
                           <title>{name}</title>
                         </path>
@@ -434,7 +560,7 @@ export default function TravelMap({
                     ? (
                         <path
                           d={path(selectedWorldFeature) || undefined}
-                          className={`map-country ${visitedCountries.has(selectedCountry) ? "is-visited" : ""}`}
+                          className={`map-country map-color-${selectedWorldColor} ${visitedCountries.has(selectedCountry) ? "is-visited" : ""}`}
                         >
                           <title>{countryName(selectedCountry, locale)}</title>
                         </path>
@@ -457,6 +583,25 @@ export default function TravelMap({
         ) : (
           <div className="map-loading" aria-hidden="true" />
         )}
+        <div className="map-zoom-control" role="group" aria-label={l.reset}>
+          <button
+            type="button"
+            onClick={() => changeZoom(0.25)}
+            aria-label={l.zoomIn}
+            title={l.zoomIn}
+          >
+            +
+          </button>
+          <button
+            type="button"
+            onClick={() => changeZoom(-0.25)}
+            aria-label={l.zoomOut}
+            title={l.zoomOut}
+            disabled={zoom <= 1}
+          >
+            −
+          </button>
+        </div>
       </div>
 
       <div className="map-summary">
