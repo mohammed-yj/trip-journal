@@ -4,6 +4,12 @@ import frCountries from "i18n-iso-countries/langs/fr.json";
 import zhCountries from "i18n-iso-countries/langs/zh.json";
 import { geoArea } from "d3-geo";
 import type { Locale } from "./i18n";
+import {
+  admin1FeatureLabel,
+  admin1SourceName,
+  canonicalAdmin1Code,
+  normalizeAdminLookup,
+} from "./admin1-locales";
 
 type CountryLabel = string | string[];
 type CountryLocale = { countries: Record<string, CountryLabel> };
@@ -45,6 +51,31 @@ const TAIWAN_NAMES: Record<Locale, string> = {
   zh: "台湾",
   en: "Taiwan",
   fr: "Taïwan",
+};
+
+const WORLD_FEATURE_NAMES: Record<string, Record<Locale, string>> = {
+  Somaliland: { zh: "索马里兰", en: "Somaliland", fr: "Somaliland" },
+  Kosovo: { zh: "科索沃", en: "Kosovo", fr: "Kosovo" },
+  "N. Cyprus": {
+    zh: "北塞浦路斯",
+    en: "Northern Cyprus",
+    fr: "Chypre du Nord",
+  },
+  "Indian Ocean Ter.": {
+    zh: "澳大利亚印度洋领地",
+    en: "Australian Indian Ocean Territories",
+    fr: "Territoires australiens de l’océan Indien",
+  },
+  "Siachen Glacier": {
+    zh: "锡亚琴冰川",
+    en: "Siachen Glacier",
+    fr: "glacier de Siachen",
+  },
+  "Ashmore and Cartier Is.": {
+    zh: "阿什莫尔和卡捷群岛",
+    en: "Ashmore and Cartier Islands",
+    fr: "îles Ashmore-et-Cartier",
+  },
 };
 
 const COUNTRY_ALIASES: Record<string, string> = {
@@ -98,6 +129,21 @@ export function countryName(code: string, locale: Locale) {
   const alpha2 = alpha3To2.get(code);
   const name = alpha2 ? locales[locale].countries[alpha2] : "";
   return Array.isArray(name) ? name[0] : name || code;
+}
+
+export function worldFeatureCode(id: unknown, sourceName: unknown) {
+  if (String(sourceName || "") === "Kosovo") return "XKK";
+  return numericToAlpha3(id);
+}
+
+export function worldFeatureName(
+  code: string,
+  sourceName: unknown,
+  locale: Locale,
+) {
+  const rawName = String(sourceName || "");
+  return WORLD_FEATURE_NAMES[rawName]?.[locale] ||
+    (code ? countryName(code, locale) : rawName);
 }
 
 export function numericToAlpha3(value: unknown) {
@@ -170,24 +216,20 @@ export function orientAdminFeatureForD3(feature: AdminFeature): AdminFeature {
   return feature;
 }
 
-export function adminFeatureName(feature: AdminFeature) {
-  return String(feature.properties?.shapeName || feature.properties?.reg_name || "");
+export function adminFeatureName(feature: AdminFeature, locale: Locale = "en") {
+  return admin1FeatureLabel(feature.properties || {}, locale);
+}
+
+export function adminFeatureSourceName(feature: AdminFeature) {
+  return admin1SourceName(feature.properties || {});
 }
 
 export function adminFeatureCode(feature: AdminFeature) {
-  return String(
-    feature.properties?.shapeISO ||
-      feature.properties?.shapeID ||
-      feature.properties?.reg_istat_code ||
-      adminFeatureName(feature),
-  );
+  return canonicalAdmin1Code(feature.properties || {});
 }
 
 export function normalizeAdminName(value: unknown) {
-  return normalized(value).replace(
-    /(province|prefecture|municipality|autonomousregion|specialadministrativeregion|oblast|krai|republic|region|state|省|市|自治区|自治區|特别行政区|特別行政區)$/u,
-    "",
-  );
+  return normalizeAdminLookup(value);
 }
 
 export async function loadAdminFeatures(code: string): Promise<AdminFeature[]> {

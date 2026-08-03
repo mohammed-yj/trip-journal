@@ -83,12 +83,15 @@ test("provides Chinese-first English and French UI without numbered navigation",
 });
 
 test("provides a persistent hierarchical travel footprint map", async () => {
-  const [app, map, mapData, styles, archive, migration, world] = await Promise.all([
+  const [app, map, mapData, mapLogic, adminLocales, styles, archive, mapMarks, migration, world] = await Promise.all([
     readFile(new URL("../app/ArchiveApp.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/TravelMap.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/map-data.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/map-logic.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/admin1-locales.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../app/api/archive/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../db/map-marks.ts", import.meta.url), "utf8"),
     readFile(new URL("../drizzle/0001_fine_living_mummy.sql", import.meta.url), "utf8"),
     readFile(new URL("../public/maps/world-countries.json", import.meta.url), "utf8"),
   ]);
@@ -104,7 +107,7 @@ test("provides a persistent hierarchical travel footprint map", async () => {
   assert.match(map, /onPointerMove=\{moveDrag\}/);
   assert.match(map, /className="map-hover-outline"/);
   assert.match(map, /className="map-selected-outline"/);
-  assert.match(map, /data-map-release="map-framing-v3"/);
+  assert.match(map, /data-map-release="map-final-v4"/);
   assert.match(map, /data-country-code=\{code\}/);
   assert.match(map, /const ZOOM_LEVELS = \[1, 2, 4, 8\]/);
   assert.match(map, /DETAIL_FOCUS_BOUNDS/);
@@ -113,10 +116,11 @@ test("provides a persistent hierarchical travel footprint map", async () => {
   assert.match(map, /key="selected-outline"/);
   assert.match(map, /const selectedWorldFeature = selectedCountry\s*\?/);
   assert.match(map, /clearHoverOutsideMap/);
-  assert.match(map, /map-admin-country-outline/);
+  assert.match(map, /className="map-admin-outer-outline"/);
+  assert.match(map, /adminOuterBoundary\(adminFeatures/);
   assert.match(map, /selectedWorldFeature && !adminFeatures\.length/);
   assert.match(map, /lastWheelAtRef/);
-  assert.match(styles, /\.map-admin-country-outline path/);
+  assert.match(styles, /\.map-admin-outer-outline/);
   assert.match(styles, /\.map-zoom-control/);
   assert.match(styles, /\.map-country\.map-color-3/);
   assert.match(styles, /\.map-hover-outline/);
@@ -129,8 +133,14 @@ test("provides a persistent hierarchical travel footprint map", async () => {
   assert.match(mapData, /orientAdminFeatureForD3/);
   assert.match(mapData, /\.map\(orientAdminFeatureForD3\)/);
   assert.match(mapData, /if \(code === "TWN"\) return TAIWAN_NAMES/);
+  assert.match(mapData, /worldFeatureName/);
+  assert.match(adminLocales, /"Beijing Municipality": "CN-BJ"/);
+  assert.match(adminLocales, /if \(shapeIso === "SU-SD"\) return "US-SD"/);
+  assert.match(mapLogic, /normalizeMapMarkInput/);
+  assert.match(mapLogic, /sourceAssociationKey/);
+  assert.match(mapLogic, /parseMapCoordinate/);
   assert.match(archive, /action === "addMapMark"/);
-  assert.match(archive, /ON CONFLICT\(mark_key\)/);
+  assert.match(mapMarks, /ON CONFLICT\(mark_key\)/);
   assert.match(migration, /CREATE TABLE `map_marks`/);
   assert.match(world, /"countries"/);
 });

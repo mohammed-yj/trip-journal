@@ -12,6 +12,8 @@ import {
   useState,
 } from "react";
 import { intlLocale, Locale, translate } from "./i18n";
+import { localizedAdmin1Name } from "./admin1-locales";
+import { countryName, resolveCountryCode } from "./map-data";
 import LocationPicker from "./LocationPicker";
 import TravelMap from "./TravelMap";
 
@@ -438,6 +440,32 @@ export default function ArchiveApp() {
     () => new Map(data.photos.map((row) => [row.id, row])),
     [data.photos],
   );
+  const venueLocationMarkMap = useMemo(
+    () =>
+      new Map(
+        data.map_marks
+          .filter((mark) => mark.source_type === "venue" && mark.source_id)
+          .map((mark) => [mark.source_id, mark]),
+      ),
+    [data.map_marks],
+  );
+  const localizedVenueLocation = (venue: Row) => {
+    const mark = venueLocationMarkMap.get(venue.id);
+    const countryCode =
+      mark?.country_code ||
+      resolveCountryCode(venue.country_code || venue.country);
+    return {
+      country: countryCode
+        ? countryName(countryCode, locale)
+        : String(venue.country || ""),
+      region: localizedAdmin1Name(
+        countryCode,
+        mark?.admin1_code,
+        mark?.admin1_name || venue.region_or_state,
+        locale,
+      ),
+    };
+  };
 
   const activeVisit =
     data.visits.find((visit) => visit.id === activeVisitId) ??
@@ -1132,6 +1160,7 @@ export default function ArchiveApp() {
   const renderPlaces = () => {
     const selectedVenue = venueMap.get(selectedVenueId);
     if (selectedVenue) {
+      const selectedLocation = localizedVenueLocation(selectedVenue);
       const venueVisits = data.visits.filter(
         (visit) => visit.venue_id === selectedVenue.id,
       );
@@ -1149,8 +1178,14 @@ export default function ArchiveApp() {
           <header className="venue-detail-head">
             <div>
               <p className="eyebrow">
-                {selectedVenue.country} / {selectedVenue.city} /{" "}
-                {selectedVenue.venue_type}
+                {[
+                  selectedLocation.country,
+                  selectedLocation.region,
+                  selectedVenue.city,
+                  t(selectedVenue.venue_type),
+                ]
+                  .filter(Boolean)
+                  .join(" / ")}
               </p>
               <h1>{selectedVenue.name}</h1>
               {selectedVenue.original_name ? (
@@ -1212,7 +1247,8 @@ export default function ArchiveApp() {
       );
     }
     const places = data.venues.reduce<Record<string, Row[]>>((groups, venue) => {
-      const key = `${venue.country} · ${venue.region_or_state || venue.city}`;
+      const location = localizedVenueLocation(venue);
+      const key = `${location.country} · ${location.region || venue.city}`;
       groups[key] = [...(groups[key] || []), venue];
       return groups;
     }, {});

@@ -121,7 +121,7 @@ export default function LocationPicker({
               const code = adminFeatureCode(item);
               return (
                 <option key={code} value={code}>
-                  {adminFeatureName(item)}
+                  {adminFeatureName(item, locale)}
                 </option>
               );
             })}
@@ -131,12 +131,12 @@ export default function LocationPicker({
       <input
         type="hidden"
         name="admin1_name"
-        value={selectedAdmin ? adminFeatureName(selectedAdmin) : ""}
+        value={selectedAdmin ? adminFeatureName(selectedAdmin, locale) : ""}
       />
       <input
         type="hidden"
         name="region_or_state"
-        value={selectedAdmin ? adminFeatureName(selectedAdmin) : ""}
+        value={selectedAdmin ? adminFeatureName(selectedAdmin, locale) : ""}
       />
 
       <label className="field">

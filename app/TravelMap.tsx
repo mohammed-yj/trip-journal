@@ -14,18 +14,36 @@ import { feature, neighbors } from "topojson-client";
 import type { Locale } from "./i18n";
 import LocationPicker from "./LocationPicker";
 import {
+  adminFeatureSourceName,
   adminFeatureCode,
   adminFeatureName,
   countryName,
   DETAILED_COUNTRIES,
   loadAdminFeatures,
   normalizeAdminName,
-  numericToAlpha3,
   resolveCountryCode,
+  worldFeatureCode,
+  worldFeatureName,
   type AdminFeature,
 } from "./map-data";
+import {
+  admin1Aliases,
+  localizedAdmin1Name,
+  resolveAdmin1Code,
+} from "./admin1-locales";
+import {
+  canonicalMarkKey,
+  deriveMapState,
+  parseLatitude,
+  parseLongitude,
+  type MapRow,
+} from "./map-logic";
+import {
+  adminOuterBoundary,
+  type PolygonFeature,
+} from "./map-geometry";
 
-type Row = Record<string, any>;
+type Row = MapRow;
 
 type Props = {
   locale: Locale;
@@ -153,7 +171,7 @@ const labels = {
 } as const;
 
 function worldCode(featureItem: WorldFeature) {
-  return numericToAlpha3(featureItem.id);
+  return worldFeatureCode(featureItem.id, featureItem.properties?.name);
 }
 
 function polygonBounds(polygon: GeoJSON.Position[][]) {
@@ -202,20 +220,6 @@ function applyBoundaryPolicy(features: WorldFeature[]) {
     ...crimeaPolygons,
   ];
   return features;
-}
-
-function finiteCoordinate(value: unknown) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
-
-function markKey(mark: Row) {
-  return [
-    mark.scope,
-    mark.country_code,
-    mark.admin1_code || normalizeAdminName(mark.admin1_name),
-    normalizeAdminName(mark.city_name),
-  ].join(":");
 }
 
 function fourColorGraph(adjacency: number[][]) {
@@ -348,6 +352,7 @@ export default function TravelMap({
     panX: number;
     panY: number;
     moved: boolean;
+    countryCode: string;
   } | null>(null);
   const suppressClickRef = useRef(false);
   const mapSvgRef = useRef<SVGSVGElement>(null);
@@ -401,95 +406,24 @@ export default function TravelMap({
     return () => window.removeEventListener("pointermove", clearHoverOutsideMap);
   }, []);
 
-  const venueMap = useMemo(
-    () => new Map(venues.map((venue) => [venue.id, venue])),
-    [venues],
-  );
-  const visitedVenueIds = useMemo(
-    () => new Set(visits.map((visit) => visit.venue_id)),
-    [visits],
-  );
-  const completedTripIds = useMemo(
-    () => new Set(trips.filter((trip) => trip.status === "已完成").map((trip) => trip.id)),
-    [trips],
-  );
-
-  const effectiveMarks = useMemo(() => {
-    const seen = new Set<string>();
-    return mapMarks.filter((mark) => {
-      const active =
-        mark.source_type === "manual" ||
-        (mark.source_type === "venue" && visitedVenueIds.has(mark.source_id)) ||
-        (mark.source_type === "trip" && completedTripIds.has(mark.source_id));
-      if (!active) return false;
-      const key = markKey(mark);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }, [mapMarks, visitedVenueIds, completedTripIds]);
-
-  const visitedVenues = useMemo(
+  const mapState = useMemo(
     () =>
-      Array.from(visitedVenueIds)
-        .map((id) => venueMap.get(id))
-        .filter(Boolean) as Row[],
-    [visitedVenueIds, venueMap],
+      deriveMapState({
+        mapMarks,
+        venues,
+        visits,
+        trips,
+        resolveCountryCode,
+        resolveAdmin1Code,
+      }),
+    [mapMarks, venues, visits, trips],
   );
-
-  const visitedCountries = useMemo(() => {
-    const set = new Set<string>();
-    effectiveMarks.forEach((mark) => set.add(mark.country_code));
-    visitedVenues.forEach((venue) => {
-      const code = resolveCountryCode(venue.country_code || venue.country);
-      if (code) set.add(code);
-    });
-    return set;
-  }, [effectiveMarks, visitedVenues]);
-
-  const visitedAdminKeys = useMemo(() => {
-    const set = new Set<string>();
-    effectiveMarks.forEach((mark) => {
-      if (mark.admin1_code) set.add(`${mark.country_code}:${mark.admin1_code}`);
-      if (mark.admin1_name) {
-        set.add(`${mark.country_code}:name:${normalizeAdminName(mark.admin1_name)}`);
-      }
-    });
-    visitedVenues.forEach((venue) => {
-      const code = resolveCountryCode(venue.country_code || venue.country);
-      if (code && venue.region_or_state) {
-        set.add(`${code}:name:${normalizeAdminName(venue.region_or_state)}`);
-      }
-    });
-    return set;
-  }, [effectiveMarks, visitedVenues]);
-
-  const pins = useMemo(() => {
-    const byKey = new Map<string, Row>();
-    effectiveMarks.forEach((mark) => {
-      const latitude = finiteCoordinate(mark.latitude);
-      const longitude = finiteCoordinate(mark.longitude);
-      if (mark.city_name && latitude !== null && longitude !== null) {
-        byKey.set(markKey(mark), { ...mark, latitude, longitude });
-      }
-    });
-    visitedVenues.forEach((venue) => {
-      const latitude = finiteCoordinate(venue.latitude);
-      const longitude = finiteCoordinate(venue.longitude);
-      if (!venue.city || latitude === null || longitude === null) return;
-      const countryCode = resolveCountryCode(venue.country_code || venue.country);
-      const key = ["city", countryCode, normalizeAdminName(venue.region_or_state), normalizeAdminName(venue.city)].join(":");
-      if (!byKey.has(key)) {
-        byKey.set(key, {
-          city_name: venue.city,
-          country_code: countryCode,
-          latitude,
-          longitude,
-        });
-      }
-    });
-    return Array.from(byKey.values());
-  }, [effectiveMarks, visitedVenues]);
+  const {
+    visitedCountries,
+    visitedAdminKeys,
+    pins,
+    regionCount,
+  } = mapState;
 
   const selectedWorldFeature = selectedCountry
     ? worldFeatures.find((item) => worldCode(item) === selectedCountry)
@@ -538,15 +472,14 @@ export default function TravelMap({
     () => fourColorGraph(featureAdjacency(adminFeatures)),
     [adminFeatures],
   );
+  const selectedAdminBoundary = useMemo(
+    () => adminOuterBoundary(adminFeatures as PolygonFeature[]),
+    [adminFeatures],
+  );
   const visiblePins = pins.filter(
     (pin) => !selectedCountry || pin.country_code === selectedCountry,
   );
   const manualMarks = mapMarks.filter((mark) => mark.source_type === "manual");
-  const regionCount = new Set(
-    effectiveMarks
-      .filter((mark) => mark.admin1_code || mark.admin1_name)
-      .map((mark) => `${mark.country_code}:${mark.admin1_code || normalizeAdminName(mark.admin1_name)}`),
-  ).size;
 
   const reset = () => {
     setSelectedCountry("");
@@ -576,9 +509,18 @@ export default function TravelMap({
     setPan((current) => clampPan(current, nextZoom));
   };
 
+  const selectCountry = (code: string) => {
+    if (!code) return;
+    setHoveredFeature(null);
+    setSelectedCountry(code);
+    setAdminFeatures([]);
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
+
   const beginDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
     if (zoom <= 1) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
+    const target = event.target as Element;
     dragRef.current = {
       pointerId: event.pointerId,
       clientX: event.clientX,
@@ -586,29 +528,39 @@ export default function TravelMap({
       panX: pan.x,
       panY: pan.y,
       moved: false,
+      countryCode:
+        target.closest<SVGPathElement>("[data-country-code]")?.dataset
+          .countryCode || "",
     };
-    setDragging(true);
   };
 
   const moveDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
     const start = dragRef.current;
     if (!start || start.pointerId !== event.pointerId) return;
+    const clientDeltaX = event.clientX - start.clientX;
+    const clientDeltaY = event.clientY - start.clientY;
+    if (!start.moved) {
+      if (Math.hypot(clientDeltaX, clientDeltaY) < 5) return;
+      start.moved = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
+      setDragging(true);
+    }
     const rect = event.currentTarget.getBoundingClientRect();
-    const deltaX = ((event.clientX - start.clientX) * 1000) / rect.width;
-    const deltaY = ((event.clientY - start.clientY) * 540) / rect.height;
-    if (Math.abs(deltaX) + Math.abs(deltaY) > 4) start.moved = true;
+    const deltaX = (clientDeltaX * 1000) / rect.width;
+    const deltaY = (clientDeltaY * 540) / rect.height;
     setPan(clampPan({ x: start.panX + deltaX, y: start.panY + deltaY }));
   };
 
   const endDrag = (event: ReactPointerEvent<SVGSVGElement>) => {
     const start = dragRef.current;
     if (!start || start.pointerId !== event.pointerId) return;
-    suppressClickRef.current = start.moved;
+    suppressClickRef.current = start.moved || Boolean(start.countryCode);
     dragRef.current = null;
     setDragging(false);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+    if (!start.moved && start.countryCode) selectCountry(start.countryCode);
     window.setTimeout(() => {
       suppressClickRef.current = false;
     }, 0);
@@ -633,21 +585,27 @@ export default function TravelMap({
     if (
       scope === "city" &&
       (!String(payload.city || "").trim() ||
-        !String(payload.latitude || "").trim() ||
-        !String(payload.longitude || "").trim())
+        parseLatitude(payload.latitude) === null ||
+        parseLongitude(payload.longitude) === null)
     ) {
       setError(l.invalidCity);
       return;
     }
-    await onAddMark(payload);
-    setAdding(false);
+    try {
+      await onAddMark(payload);
+      setAdding(false);
+    } catch (submissionError) {
+      setError(
+        submissionError instanceof Error ? submissionError.message : l.invalidCity,
+      );
+    }
   };
 
   return (
     <section
       className="travel-map-card"
       aria-label={l.title}
-      data-map-release="map-framing-v3"
+      data-map-release="map-final-v4"
     >
       <div className="travel-map-head">
         <div>
@@ -677,20 +635,14 @@ export default function TravelMap({
             onWheel={wheelZoom}
           >
             <g transform={`translate(${pan.x} ${pan.y}) translate(500 270) scale(${zoom}) translate(-500 -270)`}>
-              {selectedCountry && adminFeatures.length ? (
-                <g className="map-admin-country-outline" aria-hidden="true">
-                  {adminFeatures.map((item, index) => (
-                    <path
-                      key={`country-outline-${adminFeatureCode(item)}-${index}`}
-                      d={path(item) || undefined}
-                    />
-                  ))}
-                </g>
-              ) : null}
               {!selectedCountry
                 ? worldFeatures.map((item, index) => {
                     const code = worldCode(item);
-                    const name = code ? countryName(code, locale) : item.properties?.name || "";
+                    const name = worldFeatureName(
+                      code,
+                      item.properties?.name,
+                      locale,
+                    );
                     return (
                       <path
                         key={`${code || "feature"}-${index}`}
@@ -702,19 +654,11 @@ export default function TravelMap({
                         tabIndex={code ? 0 : undefined}
                         onClick={() => {
                           if (!code || suppressClickRef.current) return;
-                          setHoveredFeature(null);
-                          setSelectedCountry(code);
-                          setAdminFeatures([]);
-                          setZoom(1);
-                          setPan({ x: 0, y: 0 });
+                          selectCountry(code);
                         }}
                         onKeyDown={(event) => {
                           if ((event.key === "Enter" || event.key === " ") && code) {
-                            setHoveredFeature(null);
-                            setSelectedCountry(code);
-                            setAdminFeatures([]);
-                            setZoom(1);
-                            setPan({ x: 0, y: 0 });
+                            selectCountry(code);
                           }
                         }}
                         onPointerMove={() => setHoveredFeature(item)}
@@ -729,11 +673,17 @@ export default function TravelMap({
                 : adminFeatures.length
                   ? adminFeatures.map((item, index) => {
                       const code = adminFeatureCode(item);
-                      const name = adminFeatureName(item);
+                      const name = adminFeatureName(item, locale);
+                      const nameAliases = [
+                        adminFeatureSourceName(item),
+                        ...admin1Aliases(code),
+                      ];
                       const isVisited =
                         visitedAdminKeys.has(`${selectedCountry}:${code}`) ||
-                        visitedAdminKeys.has(
-                          `${selectedCountry}:name:${normalizeAdminName(name)}`,
+                        nameAliases.some((alias) =>
+                          visitedAdminKeys.has(
+                            `${selectedCountry}:name:${normalizeAdminName(alias)}`,
+                          ),
                         );
                       return (
                         <path
@@ -766,13 +716,21 @@ export default function TravelMap({
                 const point = projection([Number(pin.longitude), Number(pin.latitude)]);
                 if (!point) return null;
                 return (
-                  <g className="map-pin" transform={`translate(${point[0]} ${point[1]})`} key={`${markKey(pin)}-${index}`}>
+                  <g className="map-pin" transform={`translate(${point[0]} ${point[1]})`} key={`${canonicalMarkKey({ ...pin, scope: "city" })}-${index}`}>
                     <circle r={7 / zoom} />
                     <circle className="map-pin-core" r={2.4 / zoom} />
                     <title>{pin.city_name}</title>
                   </g>
                 );
               })}
+              {selectedAdminBoundary ? (
+                <path
+                  key="admin-outer-outline"
+                  d={path(selectedAdminBoundary) || undefined}
+                  className="map-admin-outer-outline"
+                  aria-hidden="true"
+                />
+              ) : null}
               {selectedWorldFeature && !adminFeatures.length ? (
                 <path
                   key="selected-outline"
@@ -853,19 +811,31 @@ export default function TravelMap({
 
       {manualMarks.length ? (
         <div className="manual-marks">
-          {manualMarks.slice(0, 4).map((mark) => (
-            <span key={mark.id}>
-              {mark.city_name || mark.admin1_name || mark.country_name || countryName(mark.country_code, locale)}
-              <button
-                type="button"
-                onClick={() => onRemoveMark(mark.id)}
-                aria-label={`${l.remove} ${mark.city_name || mark.country_name}`}
-                title={l.remove}
-              >
-                ×
-              </button>
-            </span>
-          ))}
+          {manualMarks.map((mark) => {
+            const displayName =
+              mark.city_name ||
+              (mark.admin1_code || mark.admin1_name
+                ? localizedAdmin1Name(
+                    mark.country_code,
+                    mark.admin1_code,
+                    mark.admin1_name,
+                    locale,
+                  )
+                : countryName(mark.country_code, locale));
+            return (
+              <span key={mark.id}>
+                {displayName}
+                <button
+                  type="button"
+                  onClick={() => onRemoveMark(mark.id)}
+                  aria-label={`${l.remove} ${displayName}`}
+                  title={l.remove}
+                >
+                  ×
+                </button>
+              </span>
+            );
+          })}
         </div>
       ) : null}
       <small className="map-source">{l.source}</small>

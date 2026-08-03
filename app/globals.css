@@ -3188,6 +3188,7 @@ img {
   stroke: color-mix(in srgb, var(--accent-dark) 74%, #fff);
 }
 
+.map-admin-outer-outline,
 .map-selected-outline,
 .map-hover-outline {
   fill: none;
@@ -3198,14 +3199,8 @@ img {
   pointer-events: none;
 }
 
-.map-admin-country-outline path {
-  fill: none;
-  stroke: #174f67;
-  stroke-width: 3.2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
-  pointer-events: none;
+.map-admin-outer-outline {
+  stroke-width: 2.6;
 }
 
 .map-selected-outline {

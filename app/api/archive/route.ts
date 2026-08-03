@@ -9,6 +9,7 @@ import {
   uid,
   upsertTagLink,
 } from "../../../db/archive";
+import { upsertMapMark } from "../../../db/map-marks";
 
 type Payload = Record<string, any>;
 
@@ -23,85 +24,6 @@ function nullable(value: unknown) {
 
 function truthy(value: unknown) {
   return value === true || value === 1 || value === "1";
-}
-
-function mapPart(value: unknown) {
-  return text(value)
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]/gu, "");
-}
-
-async function upsertMapMark(
-  db: D1Database,
-  payload: Payload,
-  sourceType = "manual",
-  sourceId: string | null = null,
-) {
-  const countryCode = text(payload.country_code).toUpperCase();
-  if (!countryCode) return "";
-  const admin1Code = nullable(payload.admin1_code);
-  const admin1Name = nullable(payload.admin1_name || payload.region_or_state);
-  const cityName = nullable(payload.city_name || payload.city);
-  const latitude = nullable(payload.latitude);
-  const longitude = nullable(payload.longitude);
-  const requestedScope = text(payload.scope);
-  const scope =
-    requestedScope === "country" || requestedScope === "admin1" || requestedScope === "city"
-      ? requestedScope
-      : cityName && latitude && longitude
-        ? "city"
-        : admin1Code || admin1Name
-          ? "admin1"
-          : "country";
-  const markKey = [
-    scope,
-    countryCode,
-    mapPart(admin1Code || admin1Name),
-    mapPart(cityName),
-  ].join(":");
-  const timestamp = now();
-  const id = uid("map");
-  await db
-    .prepare(
-      `INSERT INTO map_marks (
-        id, mark_key, scope, country_code, country_name, admin1_code, admin1_name,
-        city_name, latitude, longitude, source_type, source_id, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(mark_key) DO UPDATE SET
-        country_name = excluded.country_name,
-        admin1_code = COALESCE(excluded.admin1_code, map_marks.admin1_code),
-        admin1_name = COALESCE(excluded.admin1_name, map_marks.admin1_name),
-        city_name = COALESCE(excluded.city_name, map_marks.city_name),
-        latitude = COALESCE(excluded.latitude, map_marks.latitude),
-        longitude = COALESCE(excluded.longitude, map_marks.longitude),
-        source_type = CASE WHEN excluded.source_type = 'manual' THEN 'manual' ELSE map_marks.source_type END,
-        source_id = CASE WHEN excluded.source_type = 'manual' THEN NULL ELSE map_marks.source_id END,
-        deleted_at = NULL, updated_at = excluded.updated_at`,
-    )
-    .bind(
-      id,
-      markKey,
-      scope,
-      countryCode,
-      text(payload.country_name || payload.country, countryCode),
-      scope === "country" ? null : admin1Code,
-      scope === "country" ? null : admin1Name,
-      scope === "city" ? cityName : null,
-      scope === "city" ? latitude : null,
-      scope === "city" ? longitude : null,
-      sourceType,
-      sourceId,
-      timestamp,
-      timestamp,
-    )
-    .run();
-  const row = await db
-    .prepare("SELECT id FROM map_marks WHERE mark_key = ?")
-    .bind(markKey)
-    .first<{ id: string }>();
-  return row?.id || id;
 }
 
 async function createVenue(db: D1Database, payload: Payload, isDemo = 0) {
@@ -1063,6 +985,12 @@ export async function POST(request: Request) {
         await bindings.PHOTOS.delete(photo.storage_key);
       }
       await db.batch([
+        db.prepare(
+          "DELETE FROM map_marks WHERE source_type = 'venue' AND source_id IN (SELECT id FROM venues WHERE deleted_at IS NOT NULL)",
+        ),
+        db.prepare(
+          "DELETE FROM map_marks WHERE source_type = 'trip' AND source_id IN (SELECT id FROM trips WHERE deleted_at IS NOT NULL)",
+        ),
         db.prepare(
           "DELETE FROM photo_links WHERE photo_id IN (SELECT id FROM photo_assets WHERE deleted_at IS NOT NULL)",
         ),
