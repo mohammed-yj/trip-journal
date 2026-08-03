@@ -2557,20 +2557,26 @@ export default function ArchiveApp() {
 
   return (
     <LocaleContext.Provider value={locale}>
-    <div className={`app-shell ${view === "live" ? "is-live" : ""}`}>
+    <div
+      className={`app-shell ${view === "live" ? "is-live" : ""}`}
+      data-release="multilingual-v2"
+    >
       {view !== "live" ? (
         <aside className="side-nav">
           <div className="language-switcher" role="group" aria-label={t("语言")}>
-            {(["zh", "en", "fr"] as Locale[]).map((value) => (
-              <button
-                key={value}
-                className={locale === value ? "active" : ""}
-                onClick={() => setLocale(value)}
-                aria-pressed={locale === value}
-              >
-                {value === "zh" ? "中文" : value === "en" ? "EN" : "FR"}
-              </button>
-            ))}
+            <small>{t("语言")}</small>
+            <div>
+              {(["zh", "en", "fr"] as Locale[]).map((value) => (
+                <button
+                  key={value}
+                  className={locale === value ? "active" : ""}
+                  onClick={() => setLocale(value)}
+                  aria-pressed={locale === value}
+                >
+                  {value === "zh" ? "中文" : value === "en" ? "EN" : "FR"}
+                </button>
+              ))}
+            </div>
           </div>
           <button className="brand" onClick={() => setView("home")}>
             <span>观迹</span>

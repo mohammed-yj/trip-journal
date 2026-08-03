@@ -62,9 +62,10 @@ test("declares durable storage, archive routes, and a versioned relational schem
 });
 
 test("provides Chinese-first English and French UI without numbered navigation", async () => {
-  const [app, translations] = await Promise.all([
+  const [app, translations, layout] = await Promise.all([
     readFile(new URL("../app/ArchiveApp.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/i18n.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(app, /useState<Locale>\("zh"\)/);
@@ -72,6 +73,8 @@ test("provides Chinese-first English and French UI without numbered navigation",
   assert.match(app, /localStorage\.setItem\("guanji-locale", locale\)/);
   assert.match(app, /\["zh", "en", "fr"\]/);
   assert.match(app, /className="language-switcher"/);
+  assert.match(app, /data-release="multilingual-v2"/);
+  assert.match(layout, /import "\.\/i18n-overrides\.css"/);
   assert.doesNotMatch(app, /\["home", "概览", "01"\]/);
   assert.doesNotMatch(app, /\["visits", "到访", "02"\]/);
   assert.match(translations, /"概览": "Overview"/);
