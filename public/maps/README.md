@@ -10,6 +10,8 @@ Map geometry is presentation data, not the application's political model:
 - Taiwan is represented as an independent, separately selectable map entity.
 - The China ADM1 layer excludes Taiwan.
 - The Russia ADM1 layer uses a pre-2022 dataset and excludes Ukrainian territory.
+- The Natural Earth world layer's Crimea polygon is reassigned from Russia to
+  Ukraine at load time so the displayed sovereign boundary follows this policy.
 - ISO-coded overseas territories remain separately selectable where the world
   dataset provides separate geometry.
 

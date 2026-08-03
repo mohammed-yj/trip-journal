@@ -124,6 +124,54 @@ function worldCode(featureItem: WorldFeature) {
   return numericToAlpha3(featureItem.id);
 }
 
+function polygonBounds(polygon: GeoJSON.Position[][]) {
+  const longitudes: number[] = [];
+  const latitudes: number[] = [];
+  polygon.forEach((ring) =>
+    ring.forEach(([longitude, latitude]) => {
+      longitudes.push(Number(longitude));
+      latitudes.push(Number(latitude));
+    }),
+  );
+  return {
+    west: Math.min(...longitudes),
+    south: Math.min(...latitudes),
+    east: Math.max(...longitudes),
+    north: Math.max(...latitudes),
+  };
+}
+
+function applyBoundaryPolicy(features: WorldFeature[]) {
+  const russia = features.find((item) => worldCode(item) === "RUS");
+  const ukraine = features.find((item) => worldCode(item) === "UKR");
+  if (
+    russia?.geometry.type !== "MultiPolygon" ||
+    ukraine?.geometry.type !== "MultiPolygon"
+  ) {
+    return features;
+  }
+
+  const crimeaPolygons = russia.geometry.coordinates.filter((polygon) => {
+    const bounds = polygonBounds(polygon);
+    return (
+      bounds.west >= 31 &&
+      bounds.east <= 37 &&
+      bounds.south >= 44 &&
+      bounds.north <= 47
+    );
+  });
+  if (!crimeaPolygons.length) return features;
+
+  russia.geometry.coordinates = russia.geometry.coordinates.filter(
+    (polygon) => !crimeaPolygons.includes(polygon),
+  );
+  ukraine.geometry.coordinates = [
+    ...ukraine.geometry.coordinates,
+    ...crimeaPolygons,
+  ];
+  return features;
+}
+
 function finiteCoordinate(value: unknown) {
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
@@ -281,7 +329,9 @@ export default function TravelMap({
           topology,
           topology.objects.countries,
         ) as unknown as GeoJSON.FeatureCollection;
-        setWorldFeatures(collection.features as WorldFeature[]);
+        setWorldFeatures(
+          applyBoundaryPolicy(collection.features as WorldFeature[]),
+        );
         setWorldColors(
           fourColorGraph(neighbors(topology.objects.countries.geometries)),
         );
