@@ -535,17 +535,20 @@ export default function TravelMap({
       : null;
   }, [selectedCountry, adminFeatures.length, path]);
   const countryJumpOptions = useMemo(
-    () =>
-      worldFeatures
-        .map((item) => {
+    () => {
+      const options = new Map<string, { code: string; name: string }>();
+      worldFeatures.forEach((item) => {
           const code = worldCode(item);
-          return {
+          if (!code || options.has(code)) return;
+          options.set(code, {
             code,
             name: worldFeatureName(code, item.properties?.name, locale),
-          };
-        })
-        .filter((item) => item.code)
-        .sort((left, right) => left.name.localeCompare(right.name, locale)),
+          });
+        });
+      return Array.from(options.values()).sort((left, right) =>
+        left.name.localeCompare(right.name, locale),
+      );
+    },
     [worldFeatures, locale],
   );
 
