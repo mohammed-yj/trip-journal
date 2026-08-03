@@ -156,7 +156,7 @@ const labels = {
     empty: "添加第一段旅程后，地图会从这里亮起来。",
     manual: "手动添加",
     remove: "移除",
-    source: "地图：Natural Earth；行政区：geoBoundaries / ISTAT",
+    source: "地图：Natural Earth；行政区：geoBoundaries / ISTAT；城市：GeoNames",
     jump: "快速定位国家/地区…",
     library: "足迹库",
     libraryHint: "城市足迹会同时点亮所属国家和一级行政区；图钉使用该城市的经纬度。",
@@ -196,7 +196,7 @@ const labels = {
     empty: "Add your first trip and the map will begin to light up.",
     manual: "Manual",
     remove: "Remove",
-    source: "Map: Natural Earth; regions: geoBoundaries / ISTAT",
+    source: "Map: Natural Earth; regions: geoBoundaries / ISTAT; cities: GeoNames",
     jump: "Find a country or territory…",
     library: "Footprint library",
     libraryHint: "A city footprint also lights its country and first-level region; the pin uses the city coordinates.",
@@ -236,7 +236,7 @@ const labels = {
     empty: "Ajoutez votre premier voyage pour éclairer la carte.",
     manual: "Manuel",
     remove: "Retirer",
-    source: "Carte : Natural Earth ; régions : geoBoundaries / ISTAT",
+    source: "Carte : Natural Earth ; régions : geoBoundaries / ISTAT ; villes : GeoNames",
     jump: "Trouver un pays ou territoire…",
     library: "Bibliothèque des traces",
     libraryHint: "Une ville éclaire aussi son pays et sa région administrative ; l’épingle utilise ses coordonnées.",
@@ -778,7 +778,7 @@ export default function TravelMap({
     <section
       className="travel-map-card"
       aria-label={l.title}
-      data-map-release="map-final-v8"
+      data-map-release="map-final-v9"
     >
       <div className="travel-map-head">
         <div>
@@ -824,6 +824,13 @@ export default function TravelMap({
             onWheel={wheelZoom}
           >
             <g transform={`translate(${pan.x} ${pan.y}) translate(500 270) scale(${zoom}) translate(-500 -270)`}>
+              {selectedWorldFeature ? (
+                <defs>
+                  <clipPath id="selected-country-clip">
+                    <path d={path(selectedWorldFeature) || undefined} />
+                  </clipPath>
+                </defs>
+              ) : null}
               {!selectedCountry
                 ? worldFeatures.map((item, index) => {
                     const code = worldCode(item);
@@ -880,8 +887,9 @@ export default function TravelMap({
                   })}
                 </>
               ) : null}
-              {selectedCountry && adminFeatures.length
-                  ? adminFeatures.map((item, index) => {
+              {selectedCountry && adminFeatures.length ? (
+                <g clipPath={selectedWorldFeature ? "url(#selected-country-clip)" : undefined}>
+                  {adminFeatures.map((item, index) => {
                       const code = adminFeatureCode(item);
                       const name = adminFeatureName(item, locale);
                       const nameAliases = [
@@ -906,8 +914,9 @@ export default function TravelMap({
                           <title>{name}</title>
                         </path>
                       );
-                    })
-                  : null}
+                    })}
+                </g>
+              ) : null}
 
               {visiblePins.map((pin, index) => {
                 const point = projection([Number(pin.longitude), Number(pin.latitude)]);

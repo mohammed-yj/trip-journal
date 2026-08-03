@@ -3194,13 +3194,6 @@ img {
   stroke-width: 0.9;
 }
 
-.city-search-field small {
-  display: block;
-  margin-top: 0.35rem;
-  color: var(--muted);
-  line-height: 1.45;
-}
-
 .map-admin:not(.is-visited) {
   stroke-dasharray: 3 2;
 }
@@ -3509,7 +3502,7 @@ img {
 }
 
 .location-picker-compact {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
 }
 
@@ -3593,13 +3586,20 @@ img {
     min-height: 190px;
   }
 
-  .location-picker,
-  .location-picker-compact {
+  .location-picker {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .location-picker-compact {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 420px) {
+  .location-picker-compact {
+    grid-template-columns: 1fr;
+  }
+
   .visit-row {
     grid-template-columns: 22px 68px 1fr;
     gap: 9px;

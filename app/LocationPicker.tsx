@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Locale } from "./i18n";
 import {
   cityDisplayName,
-  cityMatches,
-  findExactCity,
+  cityOptionKey,
   loadCityOptions,
   type CityOption,
 } from "./city-data";
@@ -33,34 +32,31 @@ const copy = {
   zh: {
     country: "国家或地区",
     admin: "一级行政区",
-    city: "搜索并选择城市",
+    city: "城市",
     choose: "请选择",
     optional: "可选",
-    cityPlaceholder: "输入城市名称，例如：南京",
-    cityHint: "请从列表选择；经纬度会自动填写",
-    cityFound: "已匹配坐标",
-    cityLoading: "正在加载城市列表…",
+    chooseAdminFirst: "请先选择一级行政区",
+    chooseCity: "请选择城市",
+    cityLoading: "正在加载城市…",
   },
   en: {
     country: "Country or territory",
     admin: "State / region",
-    city: "Search and choose a city",
+    city: "City",
     choose: "Choose",
     optional: "Optional",
-    cityPlaceholder: "Type a city, for example: Nanjing",
-    cityHint: "Choose from the list; coordinates are filled automatically",
-    cityFound: "Coordinates matched",
+    chooseAdminFirst: "Choose a state / region first",
+    chooseCity: "Choose a city",
     cityLoading: "Loading cities…",
   },
   fr: {
     country: "Pays ou territoire",
     admin: "Région administrative",
-    city: "Rechercher et choisir une ville",
+    city: "Ville",
     choose: "Choisir",
     optional: "Facultatif",
-    cityPlaceholder: "Saisissez une ville, par exemple : Nankin",
-    cityHint: "Choisissez dans la liste ; les coordonnées sont automatiques",
-    cityFound: "Coordonnées trouvées",
+    chooseAdminFirst: "Choisissez d’abord une région",
+    chooseCity: "Choisissez une ville",
     cityLoading: "Chargement des villes…",
   },
 } as const;
@@ -69,25 +65,22 @@ export default function LocationPicker({
   locale,
   compact = false,
   defaultCountry = "CHN",
-  defaultCity = "",
-  scope = "country",
+  scope: requestedScope,
 }: Props) {
+  const scope = requestedScope ?? "city";
+  const preciseLocationRequired = requestedScope === "city";
   const labels = copy[locale];
-  const listId = useId();
   const options = useMemo(() => countryOptions(locale), [locale]);
   const [countryCode, setCountryCode] = useState(defaultCountry);
   const [adminCode, setAdminCode] = useState("");
   const [adminFeatures, setAdminFeatures] = useState<AdminFeature[]>([]);
   const [cities, setCities] = useState<CityOption[]>([]);
-  const [cityValue, setCityValue] = useState(defaultCity);
   const [selectedCity, setSelectedCity] = useState<CityOption>();
   const [loadedCityCountry, setLoadedCityCountry] = useState("");
 
   useEffect(() => {
     let cancelled = false;
-    if (!DETAILED_COUNTRIES.has(countryCode)) {
-      return;
-    }
+    if (!DETAILED_COUNTRIES.has(countryCode)) return;
     loadAdminFeatures(countryCode)
       .then((features) => {
         if (!cancelled) setAdminFeatures(features);
@@ -102,9 +95,7 @@ export default function LocationPicker({
 
   useEffect(() => {
     let cancelled = false;
-    if (scope !== "city" || !countryCode) {
-      return;
-    }
+    if (scope !== "city" || !countryCode) return;
     loadCityOptions(countryCode)
       .then((items) => {
         if (!cancelled) setCities(items);
@@ -120,25 +111,24 @@ export default function LocationPicker({
     };
   }, [countryCode, scope]);
 
+  const isDetailedCountry = DETAILED_COUNTRIES.has(countryCode);
   const selectedAdmin = adminFeatures.find(
     (item) => adminFeatureCode(item) === adminCode,
   );
   const eligibleCities = useMemo(
-    () => cities.filter((city) => !adminCode || city.admin1Code === adminCode),
-    [cities, adminCode],
-  );
-  const citySuggestions = useMemo(
     () =>
-      eligibleCities
-        .filter((city) => cityMatches(countryCode, city, cityValue, locale))
-        .slice(0, 120),
-    [eligibleCities, countryCode, cityValue, locale],
+      cities
+        .filter((city) => !isDetailedCountry || city.admin1Code === adminCode)
+        .toSorted((left, right) =>
+          cityDisplayName(left, locale).localeCompare(
+            cityDisplayName(right, locale),
+            locale === "zh" ? "zh-CN" : locale,
+          ),
+        ),
+    [cities, isDetailedCountry, adminCode, locale],
   );
 
-  const resetCity = () => {
-    setCityValue("");
-    setSelectedCity(undefined);
-  };
+  const resetCity = () => setSelectedCity(undefined);
 
   return (
     <div className={`location-picker ${compact ? "location-picker-compact" : ""}`}>
@@ -159,16 +149,14 @@ export default function LocationPicker({
         >
           <option value="">{labels.choose}</option>
           {options.map((item) => (
-            <option key={item.code} value={item.code}>
-              {item.name}
-            </option>
+            <option key={item.code} value={item.code}>{item.name}</option>
           ))}
         </select>
       </label>
       <input type="hidden" name="country_name" value={countryName(countryCode, locale)} />
       <input type="hidden" name="country" value={countryName(countryCode, locale)} />
 
-      {scope !== "country" && DETAILED_COUNTRIES.has(countryCode) ? (
+      {scope !== "country" && isDetailedCountry ? (
         <label className="field">
           <span>{labels.admin}</span>
           <select
@@ -178,16 +166,12 @@ export default function LocationPicker({
               setAdminCode(event.target.value);
               resetCity();
             }}
-            required={scope === "admin1"}
+            required={requestedScope === "admin1" || preciseLocationRequired}
           >
-            <option value="">{scope === "city" ? labels.optional : labels.choose}</option>
+            <option value="">{labels.choose}</option>
             {adminFeatures.map((item) => {
               const code = adminFeatureCode(item);
-              return (
-                <option key={code} value={code}>
-                  {adminFeatureName(item, locale)}
-                </option>
-              );
+              return <option key={code} value={code}>{adminFeatureName(item, locale)}</option>;
             })}
           </select>
         </label>
@@ -204,49 +188,41 @@ export default function LocationPicker({
       />
 
       {scope === "city" ? (
-        <label className="field city-search-field">
+        <label className="field city-select-field">
           <span>{labels.city}</span>
-          <input
-            name="city"
-            value={cityValue}
-            list={listId}
-            autoComplete="off"
-            placeholder={labels.cityPlaceholder}
+          <select
+            value={selectedCity ? cityOptionKey(selectedCity) : ""}
             onChange={(event) => {
-              const value = event.target.value;
-              setCityValue(value);
-              const match = findExactCity(
-                countryCode,
-                adminCode ? eligibleCities : cities,
-                value,
-                locale,
+              setSelectedCity(
+                eligibleCities.find((city) => cityOptionKey(city) === event.target.value),
               );
-              setSelectedCity(match);
-              if (match?.admin1Code && DETAILED_COUNTRIES.has(countryCode)) {
-                setAdminCode(match.admin1Code);
-              }
             }}
-            required
-          />
-          <datalist id={listId}>
-            {citySuggestions.map((city) => (
-              <option
-                key={`${city.admin1Code}:${city.name}:${city.latitude}:${city.longitude}`}
-                value={cityDisplayName(countryCode, city, locale)}
-              >
-                {city.name}
+            disabled={
+              loadedCityCountry !== countryCode ||
+              (isDetailedCountry && !adminCode)
+            }
+            required={preciseLocationRequired}
+          >
+            <option value="">
+              {loadedCityCountry !== countryCode
+                ? labels.cityLoading
+                : isDetailedCountry && !adminCode
+                  ? labels.chooseAdminFirst
+                  : labels.chooseCity}
+            </option>
+            {eligibleCities.map((city) => (
+              <option key={cityOptionKey(city)} value={cityOptionKey(city)}>
+                {cityDisplayName(city, locale)}
               </option>
             ))}
-          </datalist>
-          <small>
-            {loadedCityCountry !== countryCode
-              ? labels.cityLoading
-              : selectedCity
-                ? `${labels.cityFound} · ${selectedCity.latitude.toFixed(4)}, ${selectedCity.longitude.toFixed(4)}`
-                : labels.cityHint}
-          </small>
+          </select>
         </label>
       ) : null}
+      <input
+        type="hidden"
+        name="city"
+        value={selectedCity ? cityDisplayName(selectedCity, locale) : ""}
+      />
       <input type="hidden" name="latitude" value={selectedCity?.latitude ?? ""} />
       <input type="hidden" name="longitude" value={selectedCity?.longitude ?? ""} />
     </div>

@@ -74,3 +74,19 @@ test("canonicalizes and localizes every ADM1 feature in all three languages", as
   );
   assert.equal(canonicalAdmin1Code(piedmont.properties), "IT-21");
 });
+
+test("every detailed-country ADM1 has stored capital or major-city coordinates", async () => {
+  for (const country of ["CHN", "USA", "RUS", "GBR", "FRA", "DEU", "ITA", "JPN"]) {
+    const features = await adminFeatures(country);
+    const expectedCodes = features.map((item) => canonicalAdmin1Code(item.properties));
+    const cities = JSON.parse(
+      await readFile(
+        new URL(`../public/maps/cities/${country}.json`, import.meta.url),
+        "utf8",
+      ),
+    );
+    const coveredCodes = new Set(cities.map((row) => row[1]));
+    const missing = expectedCodes.filter((code) => !coveredCodes.has(code));
+    assert.deepEqual(missing, [], `${country} missing city coverage`);
+  }
+});
