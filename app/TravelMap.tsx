@@ -156,13 +156,27 @@ const labels = {
     invalidAdmin: "请选择一级行政区",
     invalidCity: "城市图钉需要填写城市、纬度和经度",
     countries: "个国家/地区",
-    regions: "个一级行政区",
     cities: "座城市",
     empty: "添加第一段旅程后，地图会从这里亮起来。",
     manual: "手动添加",
     remove: "移除",
     source: "地图：Natural Earth；行政区：geoBoundaries / ISTAT",
     jump: "快速定位国家/地区…",
+    library: "足迹库",
+    libraryHint: "城市足迹会同时点亮所属国家和一级行政区；图钉使用该城市的经纬度。",
+    closeLibrary: "关闭足迹库",
+    addNew: "添加新足迹",
+    manualEntries: "手动足迹",
+    automaticEntries: "来自旅程与地点",
+    automaticHint: "自动足迹请在对应旅程或地点记录中修改。",
+    emptyLibrary: "还没有手动足迹。",
+    selectAll: "全选",
+    deleteSelected: "删除已选",
+    confirmDelete: "确认删除已选足迹？删除后地图会立即更新。",
+    confirm: "确认删除",
+    deleteFailed: "部分足迹删除失败，请重试。",
+    tripSource: "旅程",
+    venueSource: "地点",
   },
   en: {
     eyebrow: "FOOTPRINT MAP",
@@ -182,13 +196,27 @@ const labels = {
     invalidAdmin: "Choose a state or region",
     invalidCity: "A city pin needs a city, latitude and longitude",
     countries: "countries / territories",
-    regions: "regions",
     cities: "cities",
     empty: "Add your first trip and the map will begin to light up.",
     manual: "Manual",
     remove: "Remove",
     source: "Map: Natural Earth; regions: geoBoundaries / ISTAT",
     jump: "Find a country or territory…",
+    library: "Footprint library",
+    libraryHint: "A city footprint also lights its country and first-level region; the pin uses the city coordinates.",
+    closeLibrary: "Close library",
+    addNew: "Add a footprint",
+    manualEntries: "Manual footprints",
+    automaticEntries: "From trips and places",
+    automaticHint: "Edit automatic footprints from their trip or place record.",
+    emptyLibrary: "No manual footprints yet.",
+    selectAll: "Select all",
+    deleteSelected: "Delete selected",
+    confirmDelete: "Delete the selected footprints? The map will update immediately.",
+    confirm: "Confirm deletion",
+    deleteFailed: "Some footprints could not be deleted. Try again.",
+    tripSource: "Trip",
+    venueSource: "Place",
   },
   fr: {
     eyebrow: "CARTE DES TRACES",
@@ -208,13 +236,27 @@ const labels = {
     invalidAdmin: "Choisissez une région administrative",
     invalidCity: "Une ville, une latitude et une longitude sont requises",
     countries: "pays / territoires",
-    regions: "régions",
     cities: "villes",
     empty: "Ajoutez votre premier voyage pour éclairer la carte.",
     manual: "Manuel",
     remove: "Retirer",
     source: "Carte : Natural Earth ; régions : geoBoundaries / ISTAT",
     jump: "Trouver un pays ou territoire…",
+    library: "Bibliothèque des traces",
+    libraryHint: "Une ville éclaire aussi son pays et sa région administrative ; l’épingle utilise ses coordonnées.",
+    closeLibrary: "Fermer la bibliothèque",
+    addNew: "Ajouter une trace",
+    manualEntries: "Traces manuelles",
+    automaticEntries: "Depuis les voyages et lieux",
+    automaticHint: "Modifiez les traces automatiques depuis le voyage ou le lieu correspondant.",
+    emptyLibrary: "Aucune trace manuelle.",
+    selectAll: "Tout sélectionner",
+    deleteSelected: "Supprimer la sélection",
+    confirmDelete: "Supprimer les traces sélectionnées ? La carte sera mise à jour immédiatement.",
+    confirm: "Confirmer la suppression",
+    deleteFailed: "Certaines traces n’ont pas pu être supprimées. Réessayez.",
+    tripSource: "Voyage",
+    venueSource: "Lieu",
   },
 } as const;
 
@@ -391,6 +433,12 @@ export default function TravelMap({
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [selectedManualIds, setSelectedManualIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deletingMarks, setDeletingMarks] = useState(false);
   const [scope, setScope] = useState("country");
   const [error, setError] = useState("");
   const dragRef = useRef<{
@@ -471,7 +519,6 @@ export default function TravelMap({
     visitedCountries,
     visitedAdminKeys,
     pins,
-    regionCount,
   } = mapState;
 
   const selectedWorldFeature = selectedCountry
@@ -575,6 +622,59 @@ export default function TravelMap({
     (pin) => !selectedCountry || pin.country_code === selectedCountry,
   );
   const manualMarks = mapMarks.filter((mark) => mark.source_type === "manual");
+  const automaticMarks = mapMarks.filter((mark) => mark.source_type !== "manual");
+  const visitedWorldFeatures = useMemo(
+    () =>
+      worldFeatures.filter((item) => visitedCountries.has(worldCode(item))),
+    [worldFeatures, visitedCountries],
+  );
+
+  const markLocationLabel = (mark: Row) => {
+    const country = countryName(mark.country_code, locale);
+    const admin = mark.admin1_code || mark.admin1_name
+      ? localizedAdmin1Name(
+          mark.country_code,
+          mark.admin1_code,
+          mark.admin1_name,
+          locale,
+        )
+      : "";
+    return [country, admin, mark.city_name].filter(Boolean).join(" / ");
+  };
+
+  const toggleManualMark = (id: string) => {
+    setConfirmingDelete(false);
+    setSelectedManualIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAllManualMarks = () => {
+    setConfirmingDelete(false);
+    setSelectedManualIds((current) =>
+      current.size === manualMarks.length
+        ? new Set()
+        : new Set(manualMarks.map((mark) => mark.id)),
+    );
+  };
+
+  const deleteSelectedMarks = async () => {
+    if (!selectedManualIds.size) return;
+    setDeletingMarks(true);
+    setError("");
+    try {
+      for (const id of selectedManualIds) await onRemoveMark(id);
+      setSelectedManualIds(new Set());
+      setConfirmingDelete(false);
+    } catch {
+      setError(l.deleteFailed);
+    } finally {
+      setDeletingMarks(false);
+    }
+  };
 
   const reset = () => {
     detailHomeRef.current = "";
@@ -686,6 +786,7 @@ export default function TravelMap({
     try {
       await onAddMark(payload);
       setAdding(false);
+      setLibraryOpen(true);
     } catch (submissionError) {
       setError(
         submissionError instanceof Error ? submissionError.message : l.invalidCity,
@@ -697,7 +798,7 @@ export default function TravelMap({
     <section
       className="travel-map-card"
       aria-label={l.title}
-      data-map-release="map-final-v5"
+      data-map-release="map-final-v6"
     >
       <div className="travel-map-head">
         <div>
@@ -850,6 +951,16 @@ export default function TravelMap({
                   </g>
                 );
               })}
+              {!selectedCountry
+                ? visitedWorldFeatures.map((item, index) => (
+                    <path
+                      key={`visited-outline-${worldCode(item)}-${index}`}
+                      d={path(item) || undefined}
+                      className="map-visited-outline"
+                      aria-hidden="true"
+                    />
+                  ))
+                : null}
               {selectedWorldFeature ? (
                 <path
                   key="selected-outline"
@@ -911,68 +1022,168 @@ export default function TravelMap({
 
       <div className="map-summary">
         <span><strong>{visitedCountries.size}</strong> {l.countries}</span>
-        <span><strong>{regionCount}</strong> {l.regions}</span>
         <span><strong>{pins.length}</strong> {l.cities}</span>
       </div>
       {!visitedCountries.size ? <p className="map-empty">{l.empty}</p> : null}
 
-      {adding ? (
-        <form className="map-add-form" onSubmit={submitMark}>
-          <div className="map-scope">
-            <span>{l.scope}</span>
-            {(["country", "admin1", "city"] as const).map((value) => (
+      {!libraryOpen ? (
+        <div className="map-library-launch">
+          <button
+            type="button"
+            className="map-add-button"
+            onClick={() => {
+              setLibraryOpen(true);
+              setAdding(true);
+            }}
+          >
+            {l.add}
+          </button>
+          <button
+            type="button"
+            className="map-library-button"
+            onClick={() => {
+              setLibraryOpen(true);
+              setAdding(false);
+            }}
+          >
+            {l.library}{manualMarks.length ? ` · ${manualMarks.length}` : ""}
+          </button>
+        </div>
+      ) : (
+        <section className="map-library" aria-label={l.library}>
+          <header className="map-library-head">
+            <div>
+              <p className="eyebrow">{l.library}</p>
+              <p>{l.libraryHint}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setLibraryOpen(false);
+                setAdding(false);
+                setConfirmingDelete(false);
+              }}
+            >
+              {l.closeLibrary}
+            </button>
+          </header>
+
+          <button
+            type="button"
+            className="map-library-add"
+            onClick={() => setAdding((current) => !current)}
+          >
+            {adding ? l.cancel : `＋ ${l.addNew}`}
+          </button>
+
+          {adding ? (
+            <form className="map-add-form" onSubmit={submitMark}>
+              <div className="map-scope">
+                <span>{l.scope}</span>
+                {(["country", "admin1", "city"] as const).map((value) => (
+                  <button
+                    type="button"
+                    key={value}
+                    className={scope === value ? "active" : ""}
+                    onClick={() => setScope(value)}
+                  >
+                    {value === "country" ? l.country : value === "admin1" ? l.admin : l.city}
+                  </button>
+                ))}
+              </div>
+              <LocationPicker locale={locale} compact />
+              {error ? <p className="map-form-error">{error}</p> : null}
+              <div className="map-form-actions">
+                <button type="button" onClick={() => setAdding(false)}>{l.cancel}</button>
+                <button className="primary" disabled={busy}>{l.save}</button>
+              </div>
+            </form>
+          ) : null}
+
+          <div className="map-library-section">
+            <div className="map-library-section-head">
+              <strong>{l.manualEntries}</strong>
+              {manualMarks.length ? (
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={selectedManualIds.size === manualMarks.length}
+                    onChange={toggleAllManualMarks}
+                  />
+                  {l.selectAll}
+                </label>
+              ) : null}
+            </div>
+            {manualMarks.length ? (
+              <div className="map-library-list">
+                {manualMarks.map((mark) => (
+                  <label className="map-library-row" key={mark.id}>
+                    <input
+                      type="checkbox"
+                      checked={selectedManualIds.has(mark.id)}
+                      onChange={() => toggleManualMark(mark.id)}
+                    />
+                    <span>
+                      <strong>{markLocationLabel(mark)}</strong>
+                      {mark.scope === "city" && mark.latitude != null && mark.longitude != null ? (
+                        <small>{mark.latitude}, {mark.longitude}</small>
+                      ) : null}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <p className="map-library-empty">{l.emptyLibrary}</p>
+            )}
+
+            {confirmingDelete ? (
+              <div className="map-delete-confirm" role="alert">
+                <p>{l.confirmDelete}</p>
+                <div>
+                  <button type="button" onClick={() => setConfirmingDelete(false)}>{l.cancel}</button>
+                  <button
+                    type="button"
+                    className="danger"
+                    onClick={deleteSelectedMarks}
+                    disabled={deletingMarks}
+                  >
+                    {l.confirm}
+                  </button>
+                </div>
+              </div>
+            ) : (
               <button
                 type="button"
-                key={value}
-                className={scope === value ? "active" : ""}
-                onClick={() => setScope(value)}
+                className="map-delete-selected"
+                onClick={() => setConfirmingDelete(true)}
+                disabled={!selectedManualIds.size || deletingMarks}
               >
-                {value === "country" ? l.country : value === "admin1" ? l.admin : l.city}
+                {l.deleteSelected}{selectedManualIds.size ? ` · ${selectedManualIds.size}` : ""}
               </button>
-            ))}
+            )}
+            {!adding && error ? <p className="map-form-error">{error}</p> : null}
           </div>
-          <LocationPicker locale={locale} compact />
-          {error ? <p className="map-form-error">{error}</p> : null}
-          <div className="map-form-actions">
-            <button type="button" onClick={() => setAdding(false)}>{l.cancel}</button>
-            <button className="primary" disabled={busy}>{l.save}</button>
-          </div>
-        </form>
-      ) : (
-        <button type="button" className="map-add-button" onClick={() => setAdding(true)}>
-          {l.add}
-        </button>
-      )}
 
-      {manualMarks.length ? (
-        <div className="manual-marks">
-          {manualMarks.map((mark) => {
-            const displayName =
-              mark.city_name ||
-              (mark.admin1_code || mark.admin1_name
-                ? localizedAdmin1Name(
-                    mark.country_code,
-                    mark.admin1_code,
-                    mark.admin1_name,
-                    locale,
-                  )
-                : countryName(mark.country_code, locale));
-            return (
-              <span key={mark.id}>
-                {displayName}
-                <button
-                  type="button"
-                  onClick={() => onRemoveMark(mark.id)}
-                  aria-label={`${l.remove} ${displayName}`}
-                  title={l.remove}
-                >
-                  ×
-                </button>
-              </span>
-            );
-          })}
-        </div>
-      ) : null}
+          {automaticMarks.length ? (
+            <div className="map-library-section is-automatic">
+              <div className="map-library-section-head">
+                <strong>{l.automaticEntries}</strong>
+              </div>
+              <p className="map-library-note">{l.automaticHint}</p>
+              <div className="map-library-list">
+                {automaticMarks.map((mark) => (
+                  <div className="map-library-row" key={mark.id}>
+                    <span className="map-source-badge">
+                      {mark.source_type === "trip" ? l.tripSource : l.venueSource}
+                    </span>
+                    <span><strong>{markLocationLabel(mark)}</strong></span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </section>
+      )}
       <small className="map-source">{l.source}</small>
     </section>
   );

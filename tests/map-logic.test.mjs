@@ -210,3 +210,26 @@ test("locale-dependent labels do not change canonical visit identity", () => {
   });
   assert.equal(chinese, french);
 });
+
+test("a city footprint lights its country and ADM1 parent with one coordinate pin", () => {
+  const state = derive({
+    mapMarks: [
+      {
+        scope: "city",
+        country_code: "USA",
+        country_name: "United States",
+        admin1_code: "US-CA",
+        admin1_name: "California",
+        city_name: "San Francisco",
+        latitude: "37.7749",
+        longitude: "-122.4194",
+        source_type: "manual",
+      },
+    ],
+  });
+
+  assert.equal(state.visitedCountries.has("USA"), true);
+  assert.equal(state.visitedAdminKeys.has("USA:US-CA"), true);
+  assert.equal(state.pins.length, 1);
+  assert.equal(state.pins[0].city_name, "San Francisco");
+});

@@ -107,7 +107,7 @@ test("provides a persistent hierarchical travel footprint map", async () => {
   assert.match(map, /onPointerMove=\{moveDrag\}/);
   assert.match(map, /className="map-hover-outline"/);
   assert.match(map, /className="map-selected-outline"/);
-  assert.match(map, /data-map-release="map-final-v5"/);
+  assert.match(map, /data-map-release="map-final-v6"/);
   assert.match(map, /data-country-code=\{code\}/);
   assert.match(map, /const ZOOM_LEVELS = \[1, 2, 4, 8\]/);
   assert.match(map, /DETAIL_FOCUS_BOUNDS/);
@@ -121,6 +121,12 @@ test("provides a persistent hierarchical travel footprint map", async () => {
   assert.match(map, /detailTerritoryFeatures/);
   assert.match(map, /detailHomeCamera/);
   assert.match(map, /className="map-country-jump"/);
+  assert.match(map, /className="map-visited-outline"/);
+  assert.match(map, /className="map-library"/);
+  assert.match(map, /toggleAllManualMarks/);
+  assert.match(map, /deleteSelectedMarks/);
+  assert.doesNotMatch(map, /className="manual-marks"/);
+  assert.doesNotMatch(map, /<strong>\{regionCount\}<\/strong>/);
   assert.match(map, /lastWheelAtRef/);
   assert.match(styles, /\.map-admin-outer-outline/);
   assert.match(styles, /\.map-zoom-control/);
@@ -129,6 +135,8 @@ test("provides a persistent hierarchical travel footprint map", async () => {
   assert.match(styles, /\.map-selected-outline/);
   assert.match(styles, /\.map-admin:not\(\.is-visited\)/);
   assert.match(styles, /\.map-country-jump select/);
+  assert.match(styles, /\.map-visited-outline/);
+  assert.match(styles, /\.map-library-row/);
   assert.match(mapData, /"CHN"[\s\S]*"USA"[\s\S]*"RUS"[\s\S]*"GBR"/);
   assert.match(mapData, /"FRA"[\s\S]*"DEU"[\s\S]*"ITA"[\s\S]*"JPN"/);
   assert.match(mapData, /CHN:\s*"\/maps\/admin1\/CHN\.json"/);

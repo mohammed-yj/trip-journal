@@ -3188,6 +3188,7 @@ img {
   stroke: color-mix(in srgb, var(--accent-dark) 74%, #fff);
 }
 
+.map-visited-outline,
 .map-admin-outer-outline,
 .map-selected-outline,
 .map-hover-outline {
@@ -3197,6 +3198,10 @@ img {
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
   pointer-events: none;
+}
+
+.map-visited-outline {
+  stroke-width: 2.5;
 }
 
 .map-admin-outer-outline {
@@ -3233,6 +3238,18 @@ img {
   font: inherit;
   font-size: 0.78rem;
   padding: 0.42rem 0.55rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .map-pin circle:first-child {
@@ -3302,6 +3319,170 @@ img {
 .map-add-button:hover {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent-soft) 75%, var(--surface));
+}
+
+.map-library-launch {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.65fr);
+  gap: 7px;
+}
+
+.map-library-button {
+  min-height: 38px;
+  border: 1px solid var(--line-dark);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.map-library {
+  display: grid;
+  gap: 11px;
+  border: 1px solid var(--line-dark);
+  border-radius: 7px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--surface) 86%, var(--paper));
+}
+
+.map-library-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.map-library-head .eyebrow {
+  margin: 0 0 4px;
+}
+
+.map-library-head p:last-child,
+.map-library-note,
+.map-library-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.map-library-head > button,
+.map-library-add,
+.map-delete-selected,
+.map-delete-confirm button {
+  border: 1px solid var(--line-dark);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 9px;
+  padding: 7px 9px;
+}
+
+.map-library-head > button {
+  flex: 0 0 auto;
+}
+
+.map-library-add {
+  justify-self: start;
+  color: var(--accent-dark);
+}
+
+.map-library-section {
+  display: grid;
+  gap: 7px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.map-library-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 10px;
+}
+
+.map-library-section-head label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.map-library-list {
+  display: grid;
+  gap: 5px;
+  max-height: 190px;
+  overflow: auto;
+}
+
+.map-library-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+  border-radius: 5px;
+  padding: 7px 8px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  color: var(--ink);
+  font-size: 9px;
+}
+
+.map-library-row > span:not(.map-source-badge) {
+  display: grid;
+  gap: 2px;
+}
+
+.map-library-row strong {
+  font-weight: 600;
+}
+
+.map-library-row small {
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.map-source-badge {
+  border-radius: 99px;
+  padding: 3px 6px;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  font-size: 8px;
+}
+
+.map-delete-selected {
+  justify-self: start;
+}
+
+.map-delete-selected:not(:disabled) {
+  border-color: color-mix(in srgb, #9b4038 45%, var(--line));
+  color: #86372f;
+}
+
+.map-delete-confirm {
+  display: grid;
+  gap: 7px;
+  border-left: 3px solid #9b4038;
+  padding: 7px 9px;
+  background: color-mix(in srgb, #9b4038 7%, var(--surface));
+}
+
+.map-delete-confirm p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 9px;
+}
+
+.map-delete-confirm > div {
+  display: flex;
+  gap: 6px;
+}
+
+.map-delete-confirm button.danger {
+  border-color: #9b4038;
+  background: #9b4038;
+  color: #fff;
 }
 
 .map-add-form {
@@ -3381,34 +3562,6 @@ img {
   font-size: 10px;
 }
 
-.manual-marks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 8px;
-}
-
-.manual-marks > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border-radius: 99px;
-  padding: 4px 5px 4px 8px;
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
-  color: var(--muted);
-  font-size: 8px;
-}
-
-.manual-marks button {
-  width: 17px;
-  height: 17px;
-  border: 0;
-  border-radius: 50%;
-  padding: 0;
-  background: transparent;
-  color: inherit;
-  line-height: 1;
-}
 
 .map-source {
   display: block;
