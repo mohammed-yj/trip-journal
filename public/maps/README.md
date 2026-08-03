@@ -4,6 +4,9 @@ The world map is derived from Natural Earth through `world-atlas`. First-level
 administrative boundaries for China, the United States, Russia, the United
 Kingdom, France, Germany, and Japan are from geoBoundaries. Italian regions are
 from `guglielmo/geojson-italy`, based on ISTAT data (CC BY 4.0).
+The searchable city catalog and coordinates are generated from
+`country-state-city` 3.2.1 (MIT) and split by country so the browser only loads
+the selected country's list.
 
 Map geometry is presentation data, not the application's political model:
 
@@ -20,3 +23,4 @@ Sources:
 - https://www.naturalearthdata.com/
 - https://www.geoboundaries.org/
 - https://github.com/guglielmo/geojson-italy
+- https://github.com/harpreetkhalsagtbit/country-state-city

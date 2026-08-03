@@ -73,6 +73,22 @@ export function normalizeMapMarkInput(
           ? "admin1"
           : "country";
 
+  // Manual input must never discard a more precise place merely because an
+  // older client submitted the default country scope. Preserve the complete
+  // country → ADM1 → city hierarchy whenever those fields are present.
+  if (sourceType === "manual") {
+    if (cityName) {
+      if (latitude === null || longitude === null) {
+        throw new Error(
+          "请从城市列表中选择城市，经纬度会自动填写",
+        );
+      }
+      scope = "city";
+    } else if (admin1Code || admin1Name) {
+      scope = "admin1";
+    }
+  }
+
   if (scope === "city" && (!cityName || latitude === null || longitude === null)) {
     if (sourceType === "manual") {
       throw new Error(

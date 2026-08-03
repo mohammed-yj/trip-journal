@@ -107,7 +107,7 @@ test("provides a persistent hierarchical travel footprint map", async () => {
   assert.match(map, /onPointerMove=\{moveDrag\}/);
   assert.match(map, /className="map-hover-outline"/);
   assert.match(map, /className="map-selected-outline"/);
-  assert.match(map, /data-map-release="map-final-v6"/);
+  assert.match(map, /data-map-release="map-final-v7"/);
   assert.match(map, /data-country-code=\{code\}/);
   assert.match(map, /const ZOOM_LEVELS = \[1, 2, 4, 8\]/);
   assert.match(map, /DETAIL_FOCUS_BOUNDS/);
@@ -123,6 +123,8 @@ test("provides a persistent hierarchical travel footprint map", async () => {
   assert.match(map, /className="map-country-jump"/);
   assert.match(map, /className="map-visited-outline"/);
   assert.match(map, /className="map-library"/);
+  assert.match(map, /scope=\{scope\}/);
+  assert.match(map, /selectedWorldFeature && !selectedAdminBoundary/);
   assert.match(map, /toggleAllManualMarks/);
   assert.match(map, /deleteSelectedMarks/);
   assert.doesNotMatch(map, /className="manual-marks"/);

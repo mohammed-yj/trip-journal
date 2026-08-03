@@ -154,7 +154,7 @@ const labels = {
     city: "城市图钉",
     save: "点亮地图",
     invalidAdmin: "请选择一级行政区",
-    invalidCity: "城市图钉需要填写城市、纬度和经度",
+    invalidCity: "请从城市列表中选择城市，经纬度会自动填写",
     countries: "个国家/地区",
     cities: "座城市",
     empty: "添加第一段旅程后，地图会从这里亮起来。",
@@ -194,7 +194,7 @@ const labels = {
     city: "City pin",
     save: "Light up map",
     invalidAdmin: "Choose a state or region",
-    invalidCity: "A city pin needs a city, latitude and longitude",
+    invalidCity: "Choose a city from the list; coordinates are filled automatically",
     countries: "countries / territories",
     cities: "cities",
     empty: "Add your first trip and the map will begin to light up.",
@@ -234,7 +234,7 @@ const labels = {
     city: "Épingle de ville",
     save: "Éclairer la carte",
     invalidAdmin: "Choisissez une région administrative",
-    invalidCity: "Une ville, une latitude et une longitude sont requises",
+    invalidCity: "Choisissez une ville dans la liste ; les coordonnées sont automatiques",
     countries: "pays / territoires",
     cities: "villes",
     empty: "Ajoutez votre premier voyage pour éclairer la carte.",
@@ -439,7 +439,7 @@ export default function TravelMap({
   );
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deletingMarks, setDeletingMarks] = useState(false);
-  const [scope, setScope] = useState("country");
+  const [scope, setScope] = useState<"country" | "admin1" | "city">("city");
   const [error, setError] = useState("");
   const dragRef = useRef<{
     pointerId: number;
@@ -769,7 +769,15 @@ export default function TravelMap({
     event.preventDefault();
     setError("");
     const payload = Object.fromEntries(new FormData(event.currentTarget).entries()) as Row;
-    payload.scope = scope;
+    const hasCity = Boolean(String(payload.city || "").trim());
+    const hasCoordinates =
+      parseLatitude(payload.latitude) !== null &&
+      parseLongitude(payload.longitude) !== null;
+    payload.scope = hasCity && hasCoordinates
+      ? "city"
+      : payload.admin1_code
+        ? "admin1"
+        : scope;
     if (scope === "admin1" && !payload.admin1_code) {
       setError(l.invalidAdmin);
       return;
@@ -798,7 +806,7 @@ export default function TravelMap({
     <section
       className="travel-map-card"
       aria-label={l.title}
-      data-map-release="map-final-v6"
+      data-map-release="map-final-v7"
     >
       <div className="travel-map-head">
         <div>
@@ -961,7 +969,7 @@ export default function TravelMap({
                     />
                   ))
                 : null}
-              {selectedWorldFeature ? (
+              {selectedWorldFeature && !selectedAdminBoundary ? (
                 <path
                   key="selected-outline"
                   d={path(selectedWorldFeature) || undefined}
@@ -1091,7 +1099,7 @@ export default function TravelMap({
                   </button>
                 ))}
               </div>
-              <LocationPicker locale={locale} compact />
+              <LocationPicker locale={locale} compact scope={scope} />
               {error ? <p className="map-form-error">{error}</p> : null}
               <div className="map-form-actions">
                 <button type="button" onClick={() => setAdding(false)}>{l.cancel}</button>

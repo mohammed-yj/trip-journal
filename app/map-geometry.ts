@@ -31,8 +31,9 @@ function geometryRings(
 /**
  * Dissolves adjacent ADM1 polygons into the exact exterior boundary represented
  * by their source geometry. Shared internal segments occur twice; exterior
- * segments occur once. Rendering the result after the fills keeps the selected
- * country outline complete at every zoom level.
+ * segments occur once. The remaining segments are stitched into continuous
+ * lines so SVG joins are smooth instead of drawing thousands of round-capped
+ * two-point fragments on top of one another.
  */
 export function adminOuterBoundary(
   features: PolygonFeature[],
@@ -63,10 +64,53 @@ export function adminOuterBoundary(
     }
   }
 
-  const coordinates = Array.from(segments.values())
+  const exterior = Array.from(segments.values())
     .filter((segment) => segment.count === 1)
     .map((segment) => segment.coordinates);
-  if (!coordinates.length) return null;
+  if (!exterior.length) return null;
+
+  const pointSegments = new Map<string, number[]>();
+  exterior.forEach(([left, right], index) => {
+    for (const point of [left, right]) {
+      const key = pointKey(point);
+      const indexes = pointSegments.get(key) || [];
+      indexes.push(index);
+      pointSegments.set(key, indexes);
+    }
+  });
+
+  const unused = new Set(exterior.map((_, index) => index));
+  const coordinates: GeoJSON.Position[][] = [];
+
+  const adjacentUnused = (point: GeoJSON.Position) =>
+    (pointSegments.get(pointKey(point)) || []).find((index) => unused.has(index));
+
+  while (unused.size) {
+    const firstIndex = unused.values().next().value as number;
+    const [left, right] = exterior[firstIndex];
+    const line: GeoJSON.Position[] = [left, right];
+    unused.delete(firstIndex);
+
+    while (true) {
+      const tail = line[line.length - 1];
+      const nextIndex = adjacentUnused(tail);
+      if (nextIndex === undefined) break;
+      const [nextLeft, nextRight] = exterior[nextIndex];
+      line.push(pointKey(nextLeft) === pointKey(tail) ? nextRight : nextLeft);
+      unused.delete(nextIndex);
+    }
+
+    while (true) {
+      const head = line[0];
+      const nextIndex = adjacentUnused(head);
+      if (nextIndex === undefined) break;
+      const [nextLeft, nextRight] = exterior[nextIndex];
+      line.unshift(pointKey(nextLeft) === pointKey(head) ? nextRight : nextLeft);
+      unused.delete(nextIndex);
+    }
+
+    coordinates.push(line);
+  }
 
   return {
     type: "Feature",

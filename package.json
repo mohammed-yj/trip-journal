@@ -11,7 +11,8 @@
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
     "test": "npm run build && node --test tests/*.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "data:cities": "node scripts/generate-city-catalog.mjs"
   },
   "dependencies": {
     "d3-geo": "^3.1.1",
@@ -35,6 +36,7 @@
     "@types/topojson-specification": "^1.0.5",
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
+    "country-state-city": "^3.2.1",
     "drizzle-kit": "0.31.10",
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.6",

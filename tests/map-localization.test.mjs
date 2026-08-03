@@ -91,10 +91,21 @@ test("extracts an exact, top-layer exterior boundary for every detailed country"
   for (const [country, expected] of Object.entries(expectedExteriorSegments)) {
     const boundary = adminOuterBoundary(await adminFeatures(country));
     assert.ok(boundary, country);
-    assert.equal(boundary.geometry.coordinates.length, expected, country);
-    for (const segment of boundary.geometry.coordinates) {
-      assert.equal(segment.length, 2);
-      assert.notDeepEqual(segment[0], segment[1]);
+    const stitchedSegmentCount = boundary.geometry.coordinates.reduce(
+      (total, line) => total + line.length - 1,
+      0,
+    );
+    assert.equal(stitchedSegmentCount, expected, country);
+    assert.ok(boundary.geometry.coordinates.length < expected, country);
+    assert.ok(
+      boundary.geometry.coordinates.some((line) => line.length > 2),
+      `${country} should contain stitched paths`,
+    );
+    for (const line of boundary.geometry.coordinates) {
+      assert.ok(line.length >= 2);
+      for (let index = 1; index < line.length; index += 1) {
+        assert.notDeepEqual(line[index - 1], line[index]);
+      }
     }
   }
 });

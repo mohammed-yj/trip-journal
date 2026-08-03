@@ -56,11 +56,11 @@ test("validates coordinate input without turning empty values into zero", () => 
 
   assert.throws(
     () => normalizeMapMarkInput({ ...baseCity, latitude: "91" }),
-    /城市图钉需要有效/,
+    /从城市列表中选择|城市图钉需要有效/,
   );
   assert.throws(
     () => normalizeMapMarkInput({ ...baseCity, longitude: "" }),
-    /城市图钉需要有效/,
+    /从城市列表中选择|城市图钉需要有效/,
   );
   assert.throws(
     () => normalizeMapMarkInput({ scope: "admin1", country_code: "USA" }),
@@ -232,4 +232,23 @@ test("a city footprint lights its country and ADM1 parent with one coordinate pi
   assert.equal(state.visitedAdminKeys.has("USA:US-CA"), true);
   assert.equal(state.pins.length, 1);
   assert.equal(state.pins[0].city_name, "San Francisco");
+});
+
+test("manual hierarchy fields override a stale country-only scope", () => {
+  const normalized = normalizeMapMarkInput({
+    scope: "country",
+    country_code: "CHN",
+    admin1_code: "CN-JS",
+    admin1_name: "江苏省",
+    city: "南京",
+    latitude: "32.0603",
+    longitude: "118.7969",
+  });
+
+  assert.equal(normalized.scope, "city");
+  assert.equal(normalized.country_code, "CHN");
+  assert.equal(normalized.admin1_code, "CN-JS");
+  assert.equal(normalized.city_name, "南京");
+  assert.equal(normalized.latitude, 32.0603);
+  assert.equal(normalized.longitude, 118.7969);
 });

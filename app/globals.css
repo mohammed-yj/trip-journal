@@ -3201,15 +3201,15 @@ img {
 }
 
 .map-visited-outline {
-  stroke-width: 2.5;
+  stroke-width: 2;
 }
 
 .map-admin-outer-outline {
-  stroke-width: 2.6;
+  stroke-width: 1.9;
 }
 
 .map-selected-outline {
-  stroke-width: 2.1;
+  stroke-width: 1.8;
 }
 
 .map-hover-outline {
@@ -3219,6 +3219,13 @@ img {
 .map-admin {
   cursor: default;
   stroke-width: 0.9;
+}
+
+.city-search-field small {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--muted);
+  line-height: 1.45;
 }
 
 .map-admin:not(.is-visited) {
