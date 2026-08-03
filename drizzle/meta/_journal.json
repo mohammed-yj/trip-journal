@@ -8,6 +8,20 @@
       "when": 1785343618129,
       "tag": "0000_fearless_sentinels",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1785735991947,
+      "tag": "0001_fine_living_mummy",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785736073474,
+      "tag": "0002_broken_bloodscream",
+      "breakpoints": true
     }
   ]
 }

@@ -25,6 +25,85 @@ function truthy(value: unknown) {
   return value === true || value === 1 || value === "1";
 }
 
+function mapPart(value: unknown) {
+  return text(value)
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]/gu, "");
+}
+
+async function upsertMapMark(
+  db: D1Database,
+  payload: Payload,
+  sourceType = "manual",
+  sourceId: string | null = null,
+) {
+  const countryCode = text(payload.country_code).toUpperCase();
+  if (!countryCode) return "";
+  const admin1Code = nullable(payload.admin1_code);
+  const admin1Name = nullable(payload.admin1_name || payload.region_or_state);
+  const cityName = nullable(payload.city_name || payload.city);
+  const latitude = nullable(payload.latitude);
+  const longitude = nullable(payload.longitude);
+  const requestedScope = text(payload.scope);
+  const scope =
+    requestedScope === "country" || requestedScope === "admin1" || requestedScope === "city"
+      ? requestedScope
+      : cityName && latitude && longitude
+        ? "city"
+        : admin1Code || admin1Name
+          ? "admin1"
+          : "country";
+  const markKey = [
+    scope,
+    countryCode,
+    mapPart(admin1Code || admin1Name),
+    mapPart(cityName),
+  ].join(":");
+  const timestamp = now();
+  const id = uid("map");
+  await db
+    .prepare(
+      `INSERT INTO map_marks (
+        id, mark_key, scope, country_code, country_name, admin1_code, admin1_name,
+        city_name, latitude, longitude, source_type, source_id, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(mark_key) DO UPDATE SET
+        country_name = excluded.country_name,
+        admin1_code = COALESCE(excluded.admin1_code, map_marks.admin1_code),
+        admin1_name = COALESCE(excluded.admin1_name, map_marks.admin1_name),
+        city_name = COALESCE(excluded.city_name, map_marks.city_name),
+        latitude = COALESCE(excluded.latitude, map_marks.latitude),
+        longitude = COALESCE(excluded.longitude, map_marks.longitude),
+        source_type = CASE WHEN excluded.source_type = 'manual' THEN 'manual' ELSE map_marks.source_type END,
+        source_id = CASE WHEN excluded.source_type = 'manual' THEN NULL ELSE map_marks.source_id END,
+        deleted_at = NULL, updated_at = excluded.updated_at`,
+    )
+    .bind(
+      id,
+      markKey,
+      scope,
+      countryCode,
+      text(payload.country_name || payload.country, countryCode),
+      scope === "country" ? null : admin1Code,
+      scope === "country" ? null : admin1Name,
+      scope === "city" ? cityName : null,
+      scope === "city" ? latitude : null,
+      scope === "city" ? longitude : null,
+      sourceType,
+      sourceId,
+      timestamp,
+      timestamp,
+    )
+    .run();
+  const row = await db
+    .prepare("SELECT id FROM map_marks WHERE mark_key = ?")
+    .bind(markKey)
+    .first<{ id: string }>();
+  return row?.id || id;
+}
+
 async function createVenue(db: D1Database, payload: Payload, isDemo = 0) {
   const timestamp = now();
   const id = text(payload.id) || uid("ven");
@@ -32,9 +111,9 @@ async function createVenue(db: D1Database, payload: Payload, isDemo = 0) {
     .prepare(
       `INSERT INTO venues (
         id, name, original_name, venue_type, city, region_or_state, country, address,
-        official_url, opening_notes, general_notes, personal_impression, is_demo,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        latitude, longitude, official_url, opening_notes, general_notes, personal_impression,
+        is_demo, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -45,6 +124,8 @@ async function createVenue(db: D1Database, payload: Payload, isDemo = 0) {
       nullable(payload.region_or_state),
       text(payload.country, "中国"),
       nullable(payload.address),
+      nullable(payload.latitude),
+      nullable(payload.longitude),
       nullable(payload.official_url),
       nullable(payload.opening_notes),
       nullable(payload.general_notes),
@@ -54,6 +135,7 @@ async function createVenue(db: D1Database, payload: Payload, isDemo = 0) {
       timestamp,
     )
     .run();
+  await upsertMapMark(db, payload, "venue", id);
   return id;
 }
 
@@ -472,7 +554,7 @@ async function clearDemo() {
 }
 
 async function restoreExport(db: D1Database, archive: Payload) {
-  if (archive.schema_version !== SCHEMA_VERSION) {
+  if (!["1.0.0", SCHEMA_VERSION].includes(archive.schema_version)) {
     throw new Error(
       `版本不兼容：需要 ${SCHEMA_VERSION}，收到 ${archive.schema_version || "未知"}`,
     );
@@ -492,6 +574,7 @@ async function restoreExport(db: D1Database, archive: Payload) {
     photo_links: "photo_links",
     trip_venues: "trip_venues",
     tag_links: "tag_links",
+    map_marks: "map_marks",
   };
   let inserted = 0;
   let skipped = 0;
@@ -824,7 +907,7 @@ export async function POST(request: Request) {
           text(payload.name, "未命名旅程"),
           nullable(payload.start_date),
           nullable(payload.end_date),
-          nullable(payload.cities),
+          nullable(payload.cities || payload.city),
           text(payload.status, "构想中"),
           nullable(payload.planning_notes),
           nullable(payload.places_to_visit),
@@ -835,6 +918,16 @@ export async function POST(request: Request) {
         )
         .run();
       result.id = id;
+      await upsertMapMark(db, payload, "trip", id);
+    } else if (action === "addMapMark") {
+      result.id = await upsertMapMark(db, payload, "manual", null);
+    } else if (action === "removeMapMark") {
+      await db
+        .prepare(
+          "UPDATE map_marks SET deleted_at = ?, updated_at = ? WHERE id = ? AND source_type = 'manual'",
+        )
+        .bind(timestamp, timestamp, payload.id)
+        .run();
     } else if (action === "createHistoricalVisit") {
       let venueId = text(payload.venue_id);
       if (!venueId) venueId = await createVenue(db, payload);

@@ -11,6 +11,8 @@
 ## 功能
 
 - 记录地点、展览、到访、观察对象、旅程、现场速记与照片组。
+- 主页足迹地图按国家/地区点亮；中、美、俄、英、法、德、意、日可细化到一级行政区，城市按经纬度显示图钉。
+- 手动添加国家、一级行政区或城市；已完成旅程和到访地点会自动补齐足迹并去重。
 - 使用标签和全文搜索重新查找记录。
 - 原始照片与结构化数据分开保存。
 - 导出 JSON、CSV、Markdown 和原始照片。
@@ -114,6 +116,8 @@ A mobile-first, private-by-default archive for travel, cities, architecture, str
 ### Features
 
 - Record places, exhibitions, visits, observed objects, trips, field notes, and photo groups.
+- Light up countries and territories on the homepage map. China, the US, Russia, the UK, France, Germany, Italy, and Japan support first-level administrative detail; cities appear as coordinate-based pins.
+- Add country, region, or city footprints manually. Completed trips and visited places fill missing footprints automatically without duplicates.
 - Rediscover entries with tags and full-text search.
 - Keep original photos separate from structured archive data.
 - Export JSON, CSV, Markdown, and original photos.
@@ -217,6 +221,8 @@ Une archive privée par défaut, pensée d'abord pour le mobile, destinée aux v
 ### Fonctionnalités
 
 - Enregistrer lieux, expositions, visites, objets observés, voyages, notes de terrain et groupes de photos.
+- Éclairer les pays et territoires sur la carte d’accueil. La Chine, les États-Unis, la Russie, le Royaume-Uni, la France, l’Allemagne, l’Italie et le Japon disposent d’un détail administratif de premier niveau ; les villes apparaissent selon leurs coordonnées.
+- Ajouter manuellement un pays, une région ou une ville. Les voyages terminés et les lieux visités complètent automatiquement les traces sans doublons.
 - Retrouver les entrées grâce aux étiquettes et à la recherche en texte intégral.
 - Conserver les photos originales séparément des données structurées.
 - Exporter JSON, CSV, Markdown et les photos originales.

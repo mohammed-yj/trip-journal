@@ -81,3 +81,26 @@ test("provides Chinese-first English and French UI without numbered navigation",
   assert.match(translations, /"概览": "Aperçu"/);
   assert.match(translations, /"设置与数据": "Réglages et données"/);
 });
+
+test("provides a persistent hierarchical travel footprint map", async () => {
+  const [app, map, mapData, archive, migration, world] = await Promise.all([
+    readFile(new URL("../app/ArchiveApp.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/TravelMap.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/map-data.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/archive/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../drizzle/0001_fine_living_mummy.sql", import.meta.url), "utf8"),
+    readFile(new URL("../public/maps/world-countries.json", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(app, /<TravelMap/);
+  assert.match(app, /＋ 添加新旅程/);
+  assert.match(map, /setZoom/);
+  assert.match(map, /onAddMark/);
+  assert.match(mapData, /"CHN"[\s\S]*"USA"[\s\S]*"RUS"[\s\S]*"GBR"/);
+  assert.match(mapData, /"FRA"[\s\S]*"DEU"[\s\S]*"ITA"[\s\S]*"JPN"/);
+  assert.match(mapData, /if \(code === "TWN"\) return TAIWAN_NAMES/);
+  assert.match(archive, /action === "addMapMark"/);
+  assert.match(archive, /ON CONFLICT\(mark_key\)/);
+  assert.match(migration, /CREATE TABLE `map_marks`/);
+  assert.match(world, /"countries"/);
+});

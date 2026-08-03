@@ -1,4 +1,4 @@
-import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 const audit = {
   createdAt: text("created_at").notNull(),
@@ -227,4 +227,27 @@ export const tripVenues = sqliteTable(
     createdAt: text("created_at").notNull(),
   },
   (table) => [primaryKey({ columns: [table.tripId, table.venueId] })],
+);
+
+export const mapMarks = sqliteTable(
+  "map_marks",
+  {
+    id: text("id").primaryKey(),
+    markKey: text("mark_key").notNull().unique(),
+    scope: text("scope").notNull(),
+    countryCode: text("country_code").notNull(),
+    countryName: text("country_name").notNull(),
+    admin1Code: text("admin1_code"),
+    admin1Name: text("admin1_name"),
+    cityName: text("city_name"),
+    latitude: text("latitude"),
+    longitude: text("longitude"),
+    sourceType: text("source_type").notNull().default("manual"),
+    sourceId: text("source_id"),
+    ...audit,
+  },
+  (table) => [
+    index("map_marks_country_idx").on(table.countryCode),
+    index("map_marks_source_idx").on(table.sourceType, table.sourceId),
+  ],
 );

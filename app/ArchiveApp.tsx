@@ -12,6 +12,8 @@ import {
   useState,
 } from "react";
 import { intlLocale, Locale, translate } from "./i18n";
+import LocationPicker from "./LocationPicker";
+import TravelMap from "./TravelMap";
 
 type Row = Record<string, any>;
 type Snapshot = {
@@ -30,11 +32,12 @@ type Snapshot = {
   trip_venues: Row[];
   tags: Row[];
   tag_links: Row[];
+  map_marks: Row[];
   trash: Row[];
 };
 
 const EMPTY: Snapshot = {
-  schema_version: "1.0.0",
+  schema_version: "1.1.0",
   venues: [],
   exhibitions: [],
   visits: [],
@@ -49,6 +52,7 @@ const EMPTY: Snapshot = {
   trip_venues: [],
   tags: [],
   tag_links: [],
+  map_marks: [],
   trash: [],
 };
 
@@ -534,6 +538,13 @@ export default function ArchiveApp() {
           venue_type: form.get("venue_type"),
           city: form.get("city"),
           country: form.get("country"),
+          country_code: form.get("country_code"),
+          country_name: form.get("country_name"),
+          region_or_state: form.get("region_or_state"),
+          admin1_code: form.get("admin1_code"),
+          admin1_name: form.get("admin1_name"),
+          latitude: form.get("latitude"),
+          longitude: form.get("longitude"),
         },
         true,
       );
@@ -713,7 +724,7 @@ export default function ArchiveApp() {
       if (kind === "json") {
         const archive = JSON.parse(body);
         const errors: string[] = [];
-        if (archive.schema_version !== data.schema_version) {
+        if (!["1.0.0", data.schema_version].includes(archive.schema_version)) {
           errors.push(t("版本不兼容：当前 {current}，文件 {file}", {
             current: data.schema_version,
             file: archive.schema_version || t("未知"),
@@ -769,7 +780,7 @@ export default function ArchiveApp() {
   const renderHome = () => (
     <div className="page home-page">
       <header className="workbench-head">
-        <div>
+        <div className="home-intro">
           <p className="eyebrow">
             {new Intl.DateTimeFormat(intlLocale(locale), {
               month: "long",
@@ -781,19 +792,33 @@ export default function ArchiveApp() {
           <p className="lede">
             {t("记录到访、街道、建筑、展览与所见之物，形成可检索、可迁移的私人档案。")}
           </p>
+          <div className="home-primary-actions">
+            <button className="home-trip-button" onClick={() => setModal("trip")}>
+              <strong>{t("＋ 添加新旅程")}</strong>
+              <span>→</span>
+            </button>
+            <button
+              className="home-visit-link"
+              onClick={() => {
+                if (activeVisit) setView("live");
+                else setModal("start");
+              }}
+              data-testid="start-visit"
+            >
+              {activeVisit ? t("继续这次记录") : t("新建到访记录")} →
+            </button>
+          </div>
         </div>
-        <button
-          className="start-visit"
-          onClick={() => {
-            if (activeVisit) setView("live");
-            else setModal("start");
-          }}
-          data-testid="start-visit"
-        >
-          <span>{activeVisit ? t("当前记录") : t("快速入口")}</span>
-          <strong>{activeVisit ? t("继续这次记录") : t("新建到访记录")}</strong>
-          <i>→</i>
-        </button>
+        <TravelMap
+          locale={locale}
+          venues={data.venues}
+          visits={data.visits}
+          trips={data.trips}
+          mapMarks={data.map_marks || []}
+          busy={busy}
+          onAddMark={(payload) => act("addMapMark", payload)}
+          onRemoveMark={(id) => act("removeMapMark", { id })}
+        />
       </header>
 
       {activeVisit ? (
@@ -2681,13 +2706,8 @@ export default function ArchiveApp() {
                   ))}
                 </select>
               </Field>
-              <Field label={t("城市")}>
-                <input name="city" placeholder={t("太原")} />
-              </Field>
-              <Field label={t("国家")}>
-                <input name="country" defaultValue="中国" />
-              </Field>
             </div>
+            <LocationPicker locale={locale} defaultCity="" />
             {data.exhibitions.length ? (
               <fieldset className="check-grid">
                 <legend>{t("关联一个或多个展览（可选）")}</legend>
@@ -2739,10 +2759,7 @@ export default function ArchiveApp() {
             <Field label={t("地点名称")}>
               <input name="name" placeholder={t("使用已有地点时可留空")} />
             </Field>
-            <div className="form-row">
-              <Field label={t("城市")}><input name="city" /></Field>
-              <Field label={t("国家")}><input name="country" defaultValue="中国" /></Field>
-            </div>
+            <LocationPicker locale={locale} />
             <div className="form-row">
               <Field label={t("日期精度")}>
                 <select name="date_precision" defaultValue="day">
@@ -2776,11 +2793,8 @@ export default function ArchiveApp() {
           >
             <Field label={t("中文名称")}><input name="name" required /></Field>
             <Field label={t("原文名称")}><input name="original_name" /></Field>
-            <div className="form-row">
-              <Field label={t("类型")}><input name="venue_type" defaultValue="城市街区" /></Field>
-              <Field label={t("城市")}><input name="city" required /></Field>
-              <Field label={t("国家")}><input name="country" defaultValue="中国" required /></Field>
-            </div>
+            <Field label={t("类型")}><input name="venue_type" defaultValue="城市街区" /></Field>
+            <LocationPicker locale={locale} />
             <Field label={t("整体笔记")}><textarea name="general_notes" rows={4} /></Field>
             <Field label={t("个人印象")}><textarea name="personal_impression" rows={4} /></Field>
             <button className="primary large" disabled={busy}>{t("保存地点")}</button>
@@ -2843,12 +2857,10 @@ export default function ArchiveApp() {
             }}
           >
             <Field label={t("旅程名称")}><input name="name" placeholder={t("2026 山西城市、建筑与古迹漫游")} required /></Field>
-            <div className="form-row">
-              <Field label={t("状态")}>
-                <select name="status">{["构想中", "计划中", "进行中", "已完成"].map((value) => <option value={value} key={value}>{t(value)}</option>)}</select>
-              </Field>
-              <Field label={t("城市")}><input name="cities" placeholder={t("郑州, 洛阳, 安阳")} /></Field>
-            </div>
+            <Field label={t("状态")}>
+              <select name="status">{["构想中", "计划中", "进行中", "已完成"].map((value) => <option value={value} key={value}>{t(value)}</option>)}</select>
+            </Field>
+            <LocationPicker locale={locale} />
             <div className="form-row">
               <Field label={t("开始")}><input type="date" name="start_date" /></Field>
               <Field label={t("结束")}><input type="date" name="end_date" /></Field>

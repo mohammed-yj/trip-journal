@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 
-export const SCHEMA_VERSION = "1.0.0";
+export const SCHEMA_VERSION = "1.1.0";
 
 type ArchiveEnv = {
   DB: D1Database;
@@ -111,6 +111,13 @@ export const schemaStatements = [
     trip_id TEXT NOT NULL, venue_id TEXT NOT NULL, planned_status TEXT NOT NULL,
     created_at TEXT NOT NULL, PRIMARY KEY (trip_id, venue_id)
   )`,
+  `CREATE TABLE IF NOT EXISTS map_marks (
+    id TEXT PRIMARY KEY, mark_key TEXT NOT NULL UNIQUE, scope TEXT NOT NULL,
+    country_code TEXT NOT NULL, country_name TEXT NOT NULL, admin1_code TEXT,
+    admin1_name TEXT, city_name TEXT, latitude TEXT, longitude TEXT,
+    source_type TEXT NOT NULL DEFAULT 'manual', source_id TEXT,
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT
+  )`,
   `CREATE TABLE IF NOT EXISTS archive_meta (
     key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL
   )`,
@@ -121,6 +128,8 @@ export const schemaStatements = [
   "CREATE INDEX IF NOT EXISTS photos_group_idx ON photo_assets(photo_group_id)",
   "CREATE INDEX IF NOT EXISTS photo_links_entity_idx ON photo_links(entity_type, entity_id)",
   "CREATE INDEX IF NOT EXISTS tag_links_entity_idx ON tag_links(entity_type, entity_id)",
+  "CREATE INDEX IF NOT EXISTS map_marks_country_idx ON map_marks(country_code)",
+  "CREATE INDEX IF NOT EXISTS map_marks_source_idx ON map_marks(source_type, source_id)",
 ] as const;
 
 let initialized = false;
@@ -175,6 +184,7 @@ export async function getSnapshot(db = getArchiveDb()) {
     tripVenues,
     tags,
     tagLinks,
+    mapMarks,
     trashVenues,
     trashExhibitions,
     trashVisits,
@@ -198,6 +208,7 @@ export async function getSnapshot(db = getArchiveDb()) {
     queryRows(db, "SELECT * FROM trip_venues ORDER BY created_at"),
     queryRows(db, "SELECT * FROM tags WHERE deleted_at IS NULL ORDER BY name"),
     queryRows(db, "SELECT * FROM tag_links ORDER BY created_at"),
+    queryRows(db, "SELECT * FROM map_marks WHERE deleted_at IS NULL ORDER BY updated_at DESC"),
     queryRows(db, "SELECT *, 'venue' AS entity_type FROM venues WHERE deleted_at IS NOT NULL"),
     queryRows(db, "SELECT *, 'exhibition' AS entity_type FROM exhibitions WHERE deleted_at IS NOT NULL"),
     queryRows(db, "SELECT *, 'visit' AS entity_type FROM visits WHERE deleted_at IS NOT NULL"),
@@ -224,6 +235,7 @@ export async function getSnapshot(db = getArchiveDb()) {
     trip_venues: tripVenues,
     tags,
     tag_links: tagLinks,
+    map_marks: mapMarks,
     trash: [
       ...trashVenues,
       ...trashExhibitions,

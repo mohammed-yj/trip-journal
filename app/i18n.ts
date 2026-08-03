@@ -92,6 +92,7 @@ const en: Record<string, string> = {
   "快速入口": "Quick start",
   "继续这次记录": "Continue this session",
   "新建到访记录": "Start a visit",
+  "＋ 添加新旅程": "+ Add a new trip",
   "正在记录 · {minutes} 分钟": "Recording · {minutes} min",
   "{count} 条记录 →": "{count} entries →",
   "01 / 建立档案": "BUILD YOUR ARCHIVE",
@@ -1027,6 +1028,7 @@ const fr: Record<string, string> = {
   "缺少当前参观": "La visite en cours est manquante",
   "请选择照片": "Sélectionnez des photos",
   "一次最多上传 30 张照片": "Vous pouvez envoyer jusqu’à 30 photos à la fois",
+  "＋ 添加新旅程": "+ Ajouter un voyage",
 };
 
 const dictionaries: Record<Exclude<Locale, "zh">, Record<string, string>> = {
