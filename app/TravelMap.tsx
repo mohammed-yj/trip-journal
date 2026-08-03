@@ -42,6 +42,38 @@ type WorldFeature = GeoJSON.Feature<GeoJSON.Geometry, { name?: string }> & {
   id?: string | number;
 };
 
+const ZOOM_LEVELS = [1, 2, 4, 8] as const;
+
+const DETAIL_FOCUS_BOUNDS: Record<
+  string,
+  [west: number, south: number, east: number, north: number]
+> = {
+  CHN: [73, 18, 135, 54],
+  USA: [-125, 24, -66, 50],
+  RUS: [19, 41, 179.5, 78],
+  GBR: [-9, 49.5, 2.5, 61],
+  FRA: [-5.5, 41, 10, 51.5],
+  DEU: [5.5, 47, 15.5, 55.2],
+  ITA: [6, 35, 19, 48],
+  JPN: [128, 30, 146, 46],
+};
+
+function focusFeature(
+  [west, south, east, north]: [number, number, number, number],
+): GeoJSON.Feature<GeoJSON.MultiPoint> {
+  return {
+    type: "Feature",
+    properties: {},
+    geometry: {
+      type: "MultiPoint",
+      coordinates: [
+        [west, south],
+        [east, north],
+      ],
+    },
+  };
+}
+
 const labels = {
   zh: {
     eyebrow: "足迹地图",
@@ -318,6 +350,8 @@ export default function TravelMap({
     moved: boolean;
   } | null>(null);
   const suppressClickRef = useRef(false);
+  const mapSvgRef = useRef<SVGSVGElement>(null);
+  const lastWheelAtRef = useRef(Number.NEGATIVE_INFINITY);
 
   useEffect(() => {
     let cancelled = false;
@@ -356,6 +390,16 @@ export default function TravelMap({
       cancelled = true;
     };
   }, [selectedCountry]);
+
+  useEffect(() => {
+    const clearHoverOutsideMap = (event: PointerEvent) => {
+      if (!mapSvgRef.current?.contains(event.target as Node)) {
+        setHoveredFeature(null);
+      }
+    };
+    window.addEventListener("pointermove", clearHoverOutsideMap);
+    return () => window.removeEventListener("pointermove", clearHoverOutsideMap);
+  }, []);
 
   const venueMap = useMemo(
     () => new Map(venues.map((venue) => [venue.id, venue])),
@@ -447,9 +491,9 @@ export default function TravelMap({
     return Array.from(byKey.values());
   }, [effectiveMarks, visitedVenues]);
 
-  const selectedWorldFeature = worldFeatures.find(
-    (item) => worldCode(item) === selectedCountry,
-  );
+  const selectedWorldFeature = selectedCountry
+    ? worldFeatures.find((item) => worldCode(item) === selectedCountry)
+    : undefined;
   const selectedWorldIndex = selectedWorldFeature
     ? worldFeatures.indexOf(selectedWorldFeature)
     : -1;
@@ -465,12 +509,13 @@ export default function TravelMap({
         type: "FeatureCollection",
         features: adminFeatures.length ? adminFeatures : [selectedWorldFeature],
       };
+      const focusBounds = DETAIL_FOCUS_BOUNDS[selectedCountry];
       next = geoMercator().fitExtent(
         [
           [34, 34],
           [966, 506],
         ],
-        details,
+        focusBounds ? focusFeature(focusBounds) : details,
       );
     } else {
       const collection: GeoJSON.FeatureCollection = {
@@ -520,8 +565,13 @@ export default function TravelMap({
     };
   };
 
-  const changeZoom = (delta: number) => {
-    const nextZoom = Math.max(1, Math.min(4, zoom + delta));
+  const changeZoom = (direction: -1 | 1) => {
+    const currentIndex = ZOOM_LEVELS.indexOf(zoom as (typeof ZOOM_LEVELS)[number]);
+    const nextIndex = Math.max(
+      0,
+      Math.min(ZOOM_LEVELS.length - 1, currentIndex + direction),
+    );
+    const nextZoom = ZOOM_LEVELS[nextIndex];
     setZoom(nextZoom);
     setPan((current) => clampPan(current, nextZoom));
   };
@@ -566,7 +616,9 @@ export default function TravelMap({
 
   const wheelZoom = (event: ReactWheelEvent<SVGSVGElement>) => {
     event.preventDefault();
-    changeZoom(event.deltaY < 0 ? 0.25 : -0.25);
+    if (event.timeStamp - lastWheelAtRef.current < 160) return;
+    lastWheelAtRef.current = event.timeStamp;
+    changeZoom(event.deltaY < 0 ? 1 : -1);
   };
 
   const submitMark = async (event: FormEvent<HTMLFormElement>) => {
@@ -595,7 +647,7 @@ export default function TravelMap({
     <section
       className="travel-map-card"
       aria-label={l.title}
-      data-map-release="adm1-rings-v1"
+      data-map-release="map-framing-v3"
     >
       <div className="travel-map-head">
         <div>
@@ -613,6 +665,7 @@ export default function TravelMap({
         ) : null}
         {worldFeatures.length ? (
           <svg
+            ref={mapSvgRef}
             viewBox="0 0 1000 540"
             role="img"
             aria-label={l.title}
@@ -620,9 +673,20 @@ export default function TravelMap({
             onPointerMove={moveDrag}
             onPointerUp={endDrag}
             onPointerCancel={endDrag}
+            onPointerLeave={() => setHoveredFeature(null)}
             onWheel={wheelZoom}
           >
             <g transform={`translate(${pan.x} ${pan.y}) translate(500 270) scale(${zoom}) translate(-500 -270)`}>
+              {selectedCountry && adminFeatures.length ? (
+                <g className="map-admin-country-outline" aria-hidden="true">
+                  {adminFeatures.map((item, index) => (
+                    <path
+                      key={`country-outline-${adminFeatureCode(item)}-${index}`}
+                      d={path(item) || undefined}
+                    />
+                  ))}
+                </g>
+              ) : null}
               {!selectedCountry
                 ? worldFeatures.map((item, index) => {
                     const code = worldCode(item);
@@ -634,8 +698,8 @@ export default function TravelMap({
                         className={`map-country map-color-${worldColors[index] ?? index % 4} ${visitedCountries.has(code) ? "is-visited" : ""}`}
                         data-country-code={code}
                         aria-label={name}
-                        role="button"
-                        tabIndex={0}
+                        role={code ? "button" : undefined}
+                        tabIndex={code ? 0 : undefined}
                         onClick={() => {
                           if (!code || suppressClickRef.current) return;
                           setHoveredFeature(null);
@@ -653,7 +717,7 @@ export default function TravelMap({
                             setPan({ x: 0, y: 0 });
                           }
                         }}
-                        onPointerEnter={() => setHoveredFeature(item)}
+                        onPointerMove={() => setHoveredFeature(item)}
                         onPointerLeave={() => setHoveredFeature(null)}
                         onFocus={() => setHoveredFeature(item)}
                         onBlur={() => setHoveredFeature(null)}
@@ -678,7 +742,7 @@ export default function TravelMap({
                           className={`map-country map-admin map-color-${adminColors[index] ?? index % 4} ${isVisited ? "is-visited" : ""}`}
                           data-admin-code={code}
                           aria-label={name}
-                          onPointerEnter={() => setHoveredFeature(item)}
+                          onPointerMove={() => setHoveredFeature(item)}
                           onPointerLeave={() => setHoveredFeature(null)}
                         >
                           <title>{name}</title>
@@ -690,7 +754,7 @@ export default function TravelMap({
                         <path
                           d={path(selectedWorldFeature) || undefined}
                           className={`map-country map-color-${selectedWorldColor} ${visitedCountries.has(selectedCountry) ? "is-visited" : ""}`}
-                          onPointerEnter={() => setHoveredFeature(selectedWorldFeature)}
+                          onPointerMove={() => setHoveredFeature(selectedWorldFeature)}
                           onPointerLeave={() => setHoveredFeature(null)}
                         >
                           <title>{countryName(selectedCountry, locale)}</title>
@@ -709,8 +773,9 @@ export default function TravelMap({
                   </g>
                 );
               })}
-              {selectedWorldFeature ? (
+              {selectedWorldFeature && !adminFeatures.length ? (
                 <path
+                  key="selected-outline"
                   d={path(selectedWorldFeature) || undefined}
                   className="map-selected-outline"
                   aria-hidden="true"
@@ -718,6 +783,7 @@ export default function TravelMap({
               ) : null}
               {hoveredFeature ? (
                 <path
+                  key="hover-outline"
                   d={path(hoveredFeature) || undefined}
                   className="map-hover-outline"
                   aria-hidden="true"
@@ -731,15 +797,16 @@ export default function TravelMap({
         <div className="map-zoom-control" role="group" aria-label={l.reset}>
           <button
             type="button"
-            onClick={() => changeZoom(0.25)}
+            onClick={() => changeZoom(1)}
             aria-label={l.zoomIn}
             title={l.zoomIn}
+            disabled={zoom >= ZOOM_LEVELS[ZOOM_LEVELS.length - 1]}
           >
             +
           </button>
           <button
             type="button"
-            onClick={() => changeZoom(-0.25)}
+            onClick={() => changeZoom(-1)}
             aria-label={l.zoomOut}
             title={l.zoomOut}
             disabled={zoom <= 1}
