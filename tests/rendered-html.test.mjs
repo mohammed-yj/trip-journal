@@ -98,9 +98,12 @@ test("provides a persistent hierarchical travel footprint map", async () => {
   assert.match(map, /setZoom/);
   assert.match(map, /onAddMark/);
   assert.match(map, /neighbors\(topology\.objects\.countries\.geometries\)/);
+  assert.match(map, /featureAdjacency\(adminFeatures\)/);
   assert.match(map, /onPointerMove=\{moveDrag\}/);
+  assert.match(map, /className="map-hover-outline"/);
   assert.match(styles, /\.map-zoom-control/);
   assert.match(styles, /\.map-country\.map-color-3/);
+  assert.match(styles, /\.map-hover-outline/);
   assert.match(mapData, /"CHN"[\s\S]*"USA"[\s\S]*"RUS"[\s\S]*"GBR"/);
   assert.match(mapData, /"FRA"[\s\S]*"DEU"[\s\S]*"ITA"[\s\S]*"JPN"/);
   assert.match(mapData, /if \(code === "TWN"\) return TAIWAN_NAMES/);

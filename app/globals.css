@@ -3188,6 +3188,16 @@ img {
   stroke: color-mix(in srgb, var(--accent-dark) 74%, #fff);
 }
 
+.map-hover-outline {
+  fill: none;
+  stroke: #174f67;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
 .map-admin {
   cursor: default;
   stroke-width: 0.9;

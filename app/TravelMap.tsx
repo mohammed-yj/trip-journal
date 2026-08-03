@@ -182,6 +182,61 @@ function fourColorGraph(adjacency: number[][]) {
   return colors.map((color, index) => (color < 0 ? index % 4 : color));
 }
 
+function geometryPoints(geometry: GeoJSON.Geometry) {
+  const points: GeoJSON.Position[] = [];
+  const collect = (value: unknown) => {
+    if (!Array.isArray(value)) return;
+    if (
+      value.length >= 2 &&
+      typeof value[0] === "number" &&
+      typeof value[1] === "number"
+    ) {
+      points.push(value as GeoJSON.Position);
+      return;
+    }
+    value.forEach(collect);
+  };
+  if ("coordinates" in geometry) collect(geometry.coordinates);
+  return points;
+}
+
+function featureAdjacency(features: AdminFeature[]) {
+  const pointOwners = new Map<string, Set<number>>();
+  features.forEach((item, featureIndex) => {
+    const uniquePoints = new Set(
+      geometryPoints(item.geometry).map(
+        ([longitude, latitude]) =>
+          `${Number(longitude).toFixed(5)},${Number(latitude).toFixed(5)}`,
+      ),
+    );
+    uniquePoints.forEach((point) => {
+      const owners = pointOwners.get(point) ?? new Set<number>();
+      owners.add(featureIndex);
+      pointOwners.set(point, owners);
+    });
+  });
+
+  const sharedPointCounts = new Map<string, number>();
+  pointOwners.forEach((ownerSet) => {
+    const owners = Array.from(ownerSet);
+    for (let left = 0; left < owners.length; left += 1) {
+      for (let right = left + 1; right < owners.length; right += 1) {
+        const key = `${owners[left]}:${owners[right]}`;
+        sharedPointCounts.set(key, (sharedPointCounts.get(key) ?? 0) + 1);
+      }
+    }
+  });
+
+  const adjacency = features.map(() => new Set<number>());
+  sharedPointCounts.forEach((sharedPoints, key) => {
+    if (sharedPoints < 2) return;
+    const [left, right] = key.split(":").map(Number);
+    adjacency[left].add(right);
+    adjacency[right].add(left);
+  });
+  return adjacency.map((neighborsForFeature) => Array.from(neighborsForFeature));
+}
+
 export default function TravelMap({
   locale,
   venues,
@@ -197,6 +252,9 @@ export default function TravelMap({
   const [worldColors, setWorldColors] = useState<number[]>([]);
   const [selectedCountry, setSelectedCountry] = useState("");
   const [adminFeatures, setAdminFeatures] = useState<AdminFeature[]>([]);
+  const [hoveredFeature, setHoveredFeature] = useState<
+    GeoJSON.Feature<GeoJSON.Geometry> | null
+  >(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
@@ -381,6 +439,10 @@ export default function TravelMap({
   }, [worldFeatures, selectedCountry, selectedWorldFeature, adminFeatures]);
 
   const path = useMemo(() => geoPath(projection), [projection]);
+  const adminColors = useMemo(
+    () => fourColorGraph(featureAdjacency(adminFeatures)),
+    [adminFeatures],
+  );
   const visiblePins = pins.filter(
     (pin) => !selectedCountry || pin.country_code === selectedCountry,
   );
@@ -394,6 +456,7 @@ export default function TravelMap({
   const reset = () => {
     setSelectedCountry("");
     setAdminFeatures([]);
+    setHoveredFeature(null);
     setZoom(1);
     setPan({ x: 0, y: 0 });
   };
@@ -519,6 +582,7 @@ export default function TravelMap({
                         tabIndex={0}
                         onClick={() => {
                           if (!code || suppressClickRef.current) return;
+                          setHoveredFeature(null);
                           setSelectedCountry(code);
                           setAdminFeatures([]);
                           setZoom(1);
@@ -526,12 +590,17 @@ export default function TravelMap({
                         }}
                         onKeyDown={(event) => {
                           if ((event.key === "Enter" || event.key === " ") && code) {
+                            setHoveredFeature(null);
                             setSelectedCountry(code);
                             setAdminFeatures([]);
                             setZoom(1);
                             setPan({ x: 0, y: 0 });
                           }
                         }}
+                        onPointerEnter={() => setHoveredFeature(item)}
+                        onPointerLeave={() => setHoveredFeature(null)}
+                        onFocus={() => setHoveredFeature(item)}
+                        onBlur={() => setHoveredFeature(null)}
                       >
                         <title>{name}</title>
                       </path>
@@ -550,7 +619,9 @@ export default function TravelMap({
                         <path
                           key={`${code}-${index}`}
                           d={path(item) || undefined}
-                          className={`map-country map-admin map-color-${index % 4} ${isVisited ? "is-visited" : ""}`}
+                          className={`map-country map-admin map-color-${adminColors[index] ?? index % 4} ${isVisited ? "is-visited" : ""}`}
+                          onPointerEnter={() => setHoveredFeature(item)}
+                          onPointerLeave={() => setHoveredFeature(null)}
                         >
                           <title>{name}</title>
                         </path>
@@ -561,6 +632,8 @@ export default function TravelMap({
                         <path
                           d={path(selectedWorldFeature) || undefined}
                           className={`map-country map-color-${selectedWorldColor} ${visitedCountries.has(selectedCountry) ? "is-visited" : ""}`}
+                          onPointerEnter={() => setHoveredFeature(selectedWorldFeature)}
+                          onPointerLeave={() => setHoveredFeature(null)}
                         >
                           <title>{countryName(selectedCountry, locale)}</title>
                         </path>
@@ -578,6 +651,13 @@ export default function TravelMap({
                   </g>
                 );
               })}
+              {hoveredFeature ? (
+                <path
+                  d={path(hoveredFeature) || undefined}
+                  className="map-hover-outline"
+                  aria-hidden="true"
+                />
+              ) : null}
             </g>
           </svg>
         ) : (
