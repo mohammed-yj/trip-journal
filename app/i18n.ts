@@ -314,7 +314,6 @@ const en: Record<string, string> = {
   "从选择一个地点开始，十秒内即可进入现场记录。": "Choose a place and start recording in seconds.",
   "开始记录": "Start recording",
   "返回首页": "Back to home",
-  "未关联展览": "No linked exhibition",
   "已连接": "Connected",
   "仅保存在本机": "Stored on this device only",
   "结束记录": "End session",
