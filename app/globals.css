@@ -3140,9 +3140,11 @@ img {
 .map-country {
   stroke: color-mix(in srgb, var(--ink) 35%, var(--surface));
   stroke-width: 0.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
   cursor: pointer;
-  transition: fill 160ms ease, stroke 160ms ease;
+  transition: fill 160ms ease, filter 160ms ease;
 }
 
 .map-country.map-color-0 {
@@ -3163,8 +3165,7 @@ img {
 
 .map-country:hover,
 .map-country:focus {
-  stroke: var(--accent-dark);
-  filter: saturate(1.12) brightness(0.96);
+  filter: saturate(1.08) brightness(0.98);
   outline: none;
 }
 
@@ -3186,34 +3187,6 @@ img {
 
 .map-country.is-visited {
   stroke: color-mix(in srgb, var(--accent-dark) 74%, #fff);
-}
-
-.map-visited-outline,
-.map-admin-outer-outline,
-.map-selected-outline,
-.map-hover-outline {
-  fill: none;
-  stroke: #174f67;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
-  pointer-events: none;
-}
-
-.map-visited-outline {
-  stroke-width: 2;
-}
-
-.map-admin-outer-outline {
-  stroke-width: 1.9;
-}
-
-.map-selected-outline {
-  stroke-width: 1.8;
-}
-
-.map-hover-outline {
-  stroke-width: 1.8;
 }
 
 .map-admin {

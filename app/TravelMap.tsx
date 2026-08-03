@@ -44,10 +44,6 @@ import {
   parseLongitude,
   type MapRow,
 } from "./map-logic";
-import {
-  adminOuterBoundary,
-  type PolygonFeature,
-} from "./map-geometry";
 
 type Row = MapRow;
 
@@ -426,9 +422,6 @@ export default function TravelMap({
   const [worldColors, setWorldColors] = useState<number[]>([]);
   const [selectedCountry, setSelectedCountry] = useState("");
   const [adminFeatures, setAdminFeatures] = useState<AdminFeature[]>([]);
-  const [hoveredFeature, setHoveredFeature] = useState<
-    GeoJSON.Feature<GeoJSON.Geometry> | null
-  >(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
@@ -492,16 +485,6 @@ export default function TravelMap({
       cancelled = true;
     };
   }, [selectedCountry]);
-
-  useEffect(() => {
-    const clearHoverOutsideMap = (event: PointerEvent) => {
-      if (!mapSvgRef.current?.contains(event.target as Node)) {
-        setHoveredFeature(null);
-      }
-    };
-    window.addEventListener("pointermove", clearHoverOutsideMap);
-    return () => window.removeEventListener("pointermove", clearHoverOutsideMap);
-  }, []);
 
   const mapState = useMemo(
     () =>
@@ -614,20 +597,11 @@ export default function TravelMap({
     () => fourColorGraph(featureAdjacency(adminFeatures)),
     [adminFeatures],
   );
-  const selectedAdminBoundary = useMemo(
-    () => adminOuterBoundary(adminFeatures as PolygonFeature[]),
-    [adminFeatures],
-  );
   const visiblePins = pins.filter(
     (pin) => !selectedCountry || pin.country_code === selectedCountry,
   );
   const manualMarks = mapMarks.filter((mark) => mark.source_type === "manual");
   const automaticMarks = mapMarks.filter((mark) => mark.source_type !== "manual");
-  const visitedWorldFeatures = useMemo(
-    () =>
-      worldFeatures.filter((item) => visitedCountries.has(worldCode(item))),
-    [worldFeatures, visitedCountries],
-  );
 
   const markLocationLabel = (mark: Row) => {
     const country = countryName(mark.country_code, locale);
@@ -680,7 +654,6 @@ export default function TravelMap({
     detailHomeRef.current = "";
     setSelectedCountry("");
     setAdminFeatures([]);
-    setHoveredFeature(null);
     setZoom(1);
     setPan({ x: 0, y: 0 });
   };
@@ -703,7 +676,6 @@ export default function TravelMap({
   const selectCountry = (code: string) => {
     if (!code) return;
     detailHomeRef.current = "";
-    setHoveredFeature(null);
     setSelectedCountry(code);
     setAdminFeatures([]);
     setZoom(1);
@@ -806,7 +778,7 @@ export default function TravelMap({
     <section
       className="travel-map-card"
       aria-label={l.title}
-      data-map-release="map-final-v7"
+      data-map-release="map-final-v8"
     >
       <div className="travel-map-head">
         <div>
@@ -849,7 +821,6 @@ export default function TravelMap({
             onPointerMove={moveDrag}
             onPointerUp={endDrag}
             onPointerCancel={endDrag}
-            onPointerLeave={() => setHoveredFeature(null)}
             onWheel={wheelZoom}
           >
             <g transform={`translate(${pan.x} ${pan.y}) translate(500 270) scale(${zoom}) translate(-500 -270)`}>
@@ -879,10 +850,6 @@ export default function TravelMap({
                             selectCountry(code);
                           }
                         }}
-                        onPointerMove={() => setHoveredFeature(item)}
-                        onPointerLeave={() => setHoveredFeature(null)}
-                        onFocus={() => setHoveredFeature(item)}
-                        onBlur={() => setHoveredFeature(null)}
                       >
                         <title>{name}</title>
                       </path>
@@ -894,8 +861,6 @@ export default function TravelMap({
                   <path
                     d={path(selectedWorldFeature) || undefined}
                     className={`map-country map-territory map-color-${selectedWorldColor} ${visitedCountries.has(selectedCountry) ? "is-visited" : ""}`}
-                    onPointerMove={() => setHoveredFeature(selectedWorldFeature)}
-                    onPointerLeave={() => setHoveredFeature(null)}
                   >
                     <title>{countryName(selectedCountry, locale)}</title>
                   </path>
@@ -908,8 +873,6 @@ export default function TravelMap({
                         className={`map-country map-territory map-color-${(selectedWorldColor + index + 1) % 4} ${visitedCountries.has(selectedCountry) || visitedCountries.has(code) ? "is-visited" : ""}`}
                         data-country-code={code}
                         aria-label={worldFeatureName(code, item.properties?.name, locale)}
-                        onPointerMove={() => setHoveredFeature(item)}
-                        onPointerLeave={() => setHoveredFeature(null)}
                       >
                         <title>{worldFeatureName(code, item.properties?.name, locale)}</title>
                       </path>
@@ -939,8 +902,6 @@ export default function TravelMap({
                           className={`map-country map-admin map-color-${adminColors[index] ?? index % 4} ${isVisited ? "is-visited" : ""}`}
                           data-admin-code={code}
                           aria-label={name}
-                          onPointerMove={() => setHoveredFeature(item)}
-                          onPointerLeave={() => setHoveredFeature(null)}
                         >
                           <title>{name}</title>
                         </path>
@@ -959,48 +920,6 @@ export default function TravelMap({
                   </g>
                 );
               })}
-              {!selectedCountry
-                ? visitedWorldFeatures.map((item, index) => (
-                    <path
-                      key={`visited-outline-${worldCode(item)}-${index}`}
-                      d={path(item) || undefined}
-                      className="map-visited-outline"
-                      aria-hidden="true"
-                    />
-                  ))
-                : null}
-              {selectedWorldFeature && !selectedAdminBoundary ? (
-                <path
-                  key="selected-outline"
-                  d={path(selectedWorldFeature) || undefined}
-                  className="map-selected-outline"
-                  aria-hidden="true"
-                />
-              ) : null}
-              {detailTerritoryFeatures.map((item, index) => (
-                <path
-                  key={`territory-outline-${worldCode(item)}-${index}`}
-                  d={path(item) || undefined}
-                  className="map-selected-outline"
-                  aria-hidden="true"
-                />
-              ))}
-              {selectedAdminBoundary ? (
-                <path
-                  key="admin-outer-outline"
-                  d={path(selectedAdminBoundary) || undefined}
-                  className="map-admin-outer-outline"
-                  aria-hidden="true"
-                />
-              ) : null}
-              {hoveredFeature ? (
-                <path
-                  key="hover-outline"
-                  d={path(hoveredFeature) || undefined}
-                  className="map-hover-outline"
-                  aria-hidden="true"
-                />
-              ) : null}
             </g>
           </svg>
         ) : (
